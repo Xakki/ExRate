@@ -1,0 +1,14 @@
+parameters:
+    fetch_rate_interval: '%env(int:FETCH_RATE_INTERVAL, 1)%'
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/DependencyInjection/'
+            - '../src/Entity/'
+            - '../src/Kernel.php'

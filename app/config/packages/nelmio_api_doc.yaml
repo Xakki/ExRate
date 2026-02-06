@@ -1,0 +1,9 @@
+nelmio_api_doc:
+    documentation:
+        info:
+            title: CBR Exchange Rate API
+            description: API for fetching exchange rates from the Central Bank of Russia.
+            version: 1.0.0
+    areas:
+        path_patterns:
+            - ^/api(?!/doc$)

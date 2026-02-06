@@ -1,0 +1,48 @@
+{
+  "mcpServers": {
+    "database": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "mysql-mcp-server",
+        "mysql_mcp_server"
+      ],
+      "env": {
+        "MYSQL_HOST": "localhost",
+        "MYSQL_PORT": "3306",
+        "MYSQL_USER": "exrate",
+        "MYSQL_PASSWORD": "123456",
+        "MYSQL_DATABASE": "exrate"
+      }
+
+    },
+    "docker": {
+      "command":"docker",
+      "args":["mcp","gateway", "run"]
+    },
+    "redis": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "redis-mcp-server@latest", "redis-mcp-server",
+        "--host", "localhost",
+        "--port", "6379",
+        "--password", ""
+      ]
+    },
+    "fetch": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-fetch"
+      ]
+    },
+    "git": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-git",
+        "--repository",
+        "/Users/xakkim/www/exrate"
+      ]
+    }
+  }
+}
