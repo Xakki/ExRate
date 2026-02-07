@@ -2,12 +2,13 @@
 
 namespace App\Message;
 
+use App\Enum\RateSource;
+
 class FetchRateMessage
 {
     public function __construct(
-        public string $date,
-        public string $currency,
-        public string $baseCurrency,
+        public \DateTimeImmutable $date,
+        public RateSource $rateSource = RateSource::CBR,
         public int $retryCount = 0,
     ) {
     }

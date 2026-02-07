@@ -12,6 +12,7 @@ framework:
         routing:
             # Route your messages to the transports
             'App\Message\FetchRateMessage': async
+            'Symfony\Component\Scheduler\RecurringMessage': async
 
 # when@test:
 #    framework:

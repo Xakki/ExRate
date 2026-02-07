@@ -16,27 +16,22 @@ class ExchangeRateRepository extends ServiceEntityRepository
         parent::__construct($registry, ExchangeRate::class);
     }
 
-    public function findOneByDateAndCurrency(\DateTimeImmutable $date, string $currency, string $baseCurrency): ?ExchangeRate
+    public function findOneByDateAndCurrency(\DateTimeImmutable $date, string $currency, string $baseCurrency, int $sourceId): ?ExchangeRate
     {
         return $this->findOneBy([
             'date' => $date,
             'currency' => $currency,
             'baseCurrency' => $baseCurrency,
+            'sourceId' => $sourceId,
         ]);
     }
 
-    public function findLatestBeforeDate(\DateTimeImmutable $date, string $currency, string $baseCurrency): ?ExchangeRate
+    public function existRates(\DateTimeImmutable $date, string $baseCurrency, int $sourceId): bool
     {
-        return $this->createQueryBuilder('e')
-            ->where('e.date < :date')
-            ->andWhere('e.currency = :currency')
-            ->andWhere('e.baseCurrency = :baseCurrency')
-            ->setParameter('date', $date)
-            ->setParameter('currency', $currency)
-            ->setParameter('baseCurrency', $baseCurrency)
-            ->orderBy('e.date', 'DESC')
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
+        return null !== $this->findOneBy([
+            'date' => $date,
+            'baseCurrency' => $baseCurrency,
+            'sourceId' => $sourceId,
+        ]);
     }
 }

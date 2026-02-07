@@ -1,7 +1,7 @@
 {
     "name": "xakki/exrate",
-    "version": "0.0.1",
-    "type": "test-project",
+    "version": "0.1",
+    "type": "project",
     "description": "Exchange Rate Service",
     "license": "MIT",
     "minimum-stability": "stable",
@@ -26,17 +26,20 @@
         "symfony/intl": "8.*",
         "symfony/lock": "8.*",
         "symfony/messenger": "8.*",
+        "symfony/monolog-bundle": "^4.0",
         "symfony/property-access": "8.*",
         "symfony/property-info": "8.*",
         "symfony/rate-limiter": "8.*",
         "symfony/redis-messenger": "8.*",
         "symfony/runtime": "8.*",
+        "symfony/scheduler": "8.*",
         "symfony/serializer": "8.*",
         "symfony/twig-bundle": "8.*",
         "symfony/validator": "8.*",
         "symfony/yaml": "8.*"
     },
     "require-dev": {
+        "dg/bypass-finals": "^1.8",
         "friendsofphp/php-cs-fixer": "^3.93",
         "phpstan/phpstan": "^2.0",
         "phpunit/phpunit": "^12.5",
@@ -85,7 +88,7 @@
         "test:phpstan-clean": "XDEBUG_MODE=off vendor/bin/phpstan clear-result-cache",
         "test:cs-check": "XDEBUG_MODE=off vendor/bin/php-cs-fixer check",
         "test:cs-fix": "XDEBUG_MODE=off vendor/bin/php-cs-fixer fix",
-        "test:unit": "XDEBUG_MODE=off bin/phpunit"
+        "test:unit": "XDEBUG_MODE=off bin/phpunit --log-junit report.xml"
     },
     "conflict": {
         "symfony/symfony": "*"

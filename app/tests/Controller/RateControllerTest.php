@@ -2,24 +2,33 @@
 
 namespace App\Tests\Controller;
 
+use App\DTO\RateResponse;
+use App\Service\ExchangeRateProvider;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 class RateControllerTest extends WebTestCase
 {
-    public function testGetRate(): void
+    public function testGetRateValidationFail(): void
     {
         $client = static::createClient();
 
+        $rateServiceMock = $this->createMock(ExchangeRateProvider::class);
+        static::getContainer()->set(ExchangeRateProvider::class, $rateServiceMock);
+
         $client->request('GET', '/api/v1/rate');
-        $this->assertResponseStatusCodeSame(422);
+        $this->assertResponseStatusCodeSame(400);
     }
 
     public function testGetRateWithValidParams(): void
     {
         $client = static::createClient();
 
+        $rateServiceMock = $this->createMock(ExchangeRateProvider::class);
+        $rateServiceMock->method('getRate')->willReturn(new RateResponse('100', '1', '2024-01-01', '2023-12-31', false));
+
+        static::getContainer()->set(ExchangeRateProvider::class, $rateServiceMock);
+
         $client->request('GET', '/api/v1/rate', ['currency' => 'USD']);
-        $status = $client->getResponse()->getStatusCode();
-        $this->assertContains($status, [200, 500]); // 500 is acceptable if CBR is down, but not 404.
+        $this->assertResponseStatusCodeSame(200);
     }
 }

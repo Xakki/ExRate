@@ -2,6 +2,7 @@
 
 namespace App\Command;
 
+use App\Enum\RateSource;
 use App\Message\FetchRateMessage;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -25,27 +26,24 @@ class FetchHistoricalRatesCommand extends Command
     {
         $this
             ->addOption('days', null, InputOption::VALUE_OPTIONAL, 'Number of days to fetch', 180)
-            ->addOption('currency', null, InputOption::VALUE_OPTIONAL, 'Currency to fetch', 'USD')
-            ->addOption('base', null, InputOption::VALUE_OPTIONAL, 'Base currency', 'RUB')
+            ->addOption('source', null, InputOption::VALUE_OPTIONAL, 'Source', RateSource::CBR->value)
         ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $days = (int) $input->getOption('days');
-        $currency = $input->getOption('currency');
-        $base = $input->getOption('base');
+        $source = $input->getOption('source');
 
-        $output->writeln("Dispatching jobs to fetch rates for the last $days days for $currency/$base...");
+        $output->writeln("Dispatching jobs to fetch rates for the last $days days for $source");
 
         $today = new \DateTimeImmutable();
 
         for ($i = 0; $i < $days; ++$i) {
             $date = $today->modify("-$i days");
             $this->bus->dispatch(new FetchRateMessage(
-                $date->format('Y-m-d'),
-                $currency,
-                $base
+                $date,
+                RateSource::from($source)
             ));
         }
 

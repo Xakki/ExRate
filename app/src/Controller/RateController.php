@@ -1,10 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Controller;
 
 use App\DTO\RateRequest;
 use App\DTO\RateResponse;
-use App\Service\ExchangeRateService;
+use App\Service\ExchangeRateProvider;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -15,7 +17,7 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/api/v1')]
 class RateController extends AbstractController
 {
-    public function __construct(private ExchangeRateService $service)
+    public function __construct(private readonly ExchangeRateProvider $provider)
     {
     }
 
@@ -26,18 +28,15 @@ class RateController extends AbstractController
         content: new OA\JsonContent(ref: new Model(type: RateResponse::class))
     )]
     public function getRate(
-        #[MapQueryString] RateRequest $request,
+        #[MapQueryString(validationFailedStatusCode: 400)] RateRequest $request,
     ): JsonResponse {
-        $data = $this->service->getRate(
+        $response = $this->provider->getRate(
             $request->getDateImmutable(),
             $request->currency,
-            $request->baseCurrency
+            $request->baseCurrency,
+            $request->source
         );
 
-        return $this->json(new RateResponse(
-            $data['rate'],
-            $data['diff'],
-            $data['date']
-        ));
+        return $this->json($response);
     }
 }

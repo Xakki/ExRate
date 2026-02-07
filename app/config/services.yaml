@@ -1,10 +1,17 @@
 parameters:
-    fetch_rate_interval: '%env(int:FETCH_RATE_INTERVAL, 1)%'
+    fetch_rate_interval: '%env(int:FETCH_RATE_INTERVAL)%'
+    currency_precision: '%env(int:CURRENCY_PRECISION)%'
 
 services:
     _defaults:
         autowire: true
         autoconfigure: true
+        bind:
+            $currencyPrecision: '%currency_precision%'
+
+    _instanceof:
+        App\Contract\RateSourceInterface:
+            tags: ['app.rate_source']
 
     App\:
         resource: '../src/'
@@ -12,3 +19,21 @@ services:
             - '../src/DependencyInjection/'
             - '../src/Entity/'
             - '../src/Kernel.php'
+            - '../src/Service/ExchangeRateService.php'
+
+    App\Contract\CacheManagerInterface:
+        alias: App\Service\CacheManager
+
+    App\Service\RateSourceRegistry:
+        arguments:
+            $locator: !tagged_locator { tag: 'app.rate_source', default_index_method: 'getServiceName' }
+
+    App\Service\RateSource\CbrRateSource:
+        arguments:
+            $id: 1
+            $url: 'https://cbr.ru/scripts/XML_daily.asp'
+            $currencyPrecision: 8
+
+    test.service_container:
+        alias: service_container
+        public: true

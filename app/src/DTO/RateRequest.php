@@ -1,26 +1,36 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\DTO;
 
+use App\Enum\RateSource;
 use OpenApi\Attributes as OA;
 use Symfony\Component\Serializer\Attribute\Ignore;
 use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
+/**
+ * Request DTO for fetching exchange rates.
+ */
 class RateRequest
 {
     #[Assert\Date]
-    #[OA\Property(description: 'Date in YYYY-MM-DD format. Min: 1993-01-29, Max: today', format: 'date', example: '2025-02-06')]
+    #[OA\Property(description: 'Date in YYYY-MM-DD format. Min: 1993-01-29, Max: today', format: 'date', default: 'today', example: '2025-02-06')]
     public ?string $date = null;
 
     #[Assert\NotBlank]
     #[Assert\Currency]
-    #[OA\Property(description: 'Target currency code (ISO 4217)', example: 'USD')]
-    public string $currency;
+    #[OA\Property(description: 'Target currency code (ISO 4217)', maxLength: 3, minLength: 3, example: 'USD')]
+    public string $currency = '';
 
     #[Assert\Currency]
-    #[OA\Property(description: 'Base currency code (ISO 4217)', example: 'RUB')]
+    #[OA\Property(description: 'Base currency code (ISO 4217)', maxLength: 3, minLength: 3, example: 'RUB')]
     public string $baseCurrency = 'RUB';
+
+    #[Assert\Choice(callback: [RateSource::class, 'cases'])]
+    #[OA\Property(description: 'Rate source', type: 'string', enum: [RateSource::CBR])]
+    public RateSource $source = RateSource::CBR;
 
     #[Assert\Callback]
     public function validateDateRange(ExecutionContextInterface $context): void

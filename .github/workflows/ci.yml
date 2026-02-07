@@ -1,0 +1,68 @@
+name: ProfMatrix Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  APP_ENV: "test"
+  MACHINE_NAME: "github-test"
+
+jobs:
+  tests:
+    runs-on: self-hosted
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          clean: false
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: laravel/vendor
+          key: ${{ runner.os }}-vendor-${{ hashFiles('laravel/composer.lock') }}
+          restore-keys: ${{ runner.os }}-vendor-
+
+      - name: Up dockers
+        run: |
+            make composer-install
+            make up
+        timeout-minutes: 5
+
+      - name: Logs if up failed
+        if: ${{ steps.up.outcome == 'failure' }}
+        run: |
+            make ps
+            make logs name=php
+
+      - name: Run PHPStan
+        run: |
+          make phpstan
+        timeout-minutes: 5
+
+      - name: Run PHPCS
+        run: |
+          make cs-check
+        timeout-minutes: 5
+
+      - name: Run Unit Tests
+        run: make test
+        timeout-minutes: 5
+
+      - name: Down dockers
+        if: always()
+        run: make down
+        timeout-minutes: 1
+        continue-on-error: true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.sha }}
+          path: app/report.xml
+          retention-days: 7

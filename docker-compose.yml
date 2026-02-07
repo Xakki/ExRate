@@ -66,6 +66,9 @@ services:
 
   database:
     image: mariadb:11
+    restart: unless-stopped
+    stop_grace_period: 5s
+    stop_signal: SIGTERM
     environment:
       TZ: ${TZ}
       MARIADB_DATABASE: ${MARIADB_DATABASE}
@@ -91,6 +94,7 @@ services:
   cache:
     image: eqalpha/keydb:latest
     restart: unless-stopped
+    stop_grace_period: 5s
     stop_signal: SIGTERM
     ports:
       - "${CACHE_PORT:-6379}:6379"

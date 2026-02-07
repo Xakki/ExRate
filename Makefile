@@ -13,7 +13,7 @@ TTY ?= $(shell if [ -t 0 ]; then echo "-it"; else echo ""; fi)
 PWD := $(shell pwd)
 
 dc:= docker compose
-php-composer := docker run --rm -v ${PWD}/app:/app -w /app --env-file .env ${TTY} composer:2
+php-composer := docker run --rm -v ${PWD}/app:/app -w /app --env-file .env_dist ${TTY} composer:2
 
 ##@ Help
 help:  ## Display this help
@@ -35,37 +35,57 @@ down: ## Docker down
 build: ## Build
 	$(dc) build
 
+ps: ## PS
+	$(dc) ps
+
 logs-follow: ## Docker logs follow
 	$(dc) logs --tail=20 --follow $(name)
 
 logs: ## Docker logs last 200
 	$(dc) logs --tail=200 $(name)
 
-php-console: ## PHP shell
+php-console: ## PHP interactive shell
 	$(dc) exec php sh
 
 php-restart: ## PHP restart
 	$(dc) restart php
 
-##@ Composer & tools
+##@ Composer
 
 composer-bash: ## Composer bash
 	$(php-composer) bash
 
 composer-install: ## Install dependencies
-	$(php-composer) composer i --ignore-platform-reqs
+	$(php-composer) composer i --ignore-platform-reqs $(name)
 
 composer-update: ## Update dependencies
-	$(php-composer) composer u --ignore-platform-reqs
+	$(php-composer) composer u --ignore-platform-reqs $(name)
 
-migrate: ## Run migrations
-	$(dc) exec php bin/console doctrine:migrations:migrate --no-interaction
+##@ Tools
 
 console: ## Symfony console
 	$(dc) exec php bin/console $(cmd)
 
+migrate: ## Run migrations
+	@make console cmd="doctrine:migrations:migrate --no-interaction" --no-print-directory
+
 load-rates: ## Load rates from 180 last days
-	@make console cmd="app:fetch-history --days=180"
+	@make console cmd="app:fetch-history --days=180" --no-print-directory
+
+queue-run: ## manual Run Queue
+	@make console cmd="messenger:consume async -vv" --no-print-directory
+
+clear-file-cache: ## Clear file cache
+	$(dc) exec php rm -rf /app/var/cache
+
+db-reset: ## Reset database and redis
+	$(dc) exec cache keydb-cli FLUSHALL
+	@make console cmd="doctrine:database:drop --force --if-exists" --no-print-directory
+	@make console cmd="doctrine:database:create" --no-print-directory
+	@make migrate --no-print-directory
+
+generate-secret:
+	php -r "print bin2hex(random_bytes(26));"
 
 ##@ Tests
 
@@ -80,3 +100,20 @@ cs-fix: ## Codestyle fixer
 
 cs-check: ## Codestyle check
 	$(dc) exec php composer test:cs-check
+
+
+##@ Supervisor
+supervisor-update: ## update
+	$(dc) exec php supervisorctl update all
+
+supervisor-restart: ## restart
+	$(dc) exec php supervisorctl restart all
+
+supervisor-start: ## start
+	$(dc) exec php supervisorctl start all
+
+supervisor-status: ## status
+	$(dc) exec php supervisorctl status
+
+supervisor-stop: ## stop
+	$(dc) exec php supervisorctl stop all

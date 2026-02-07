@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Entity;
 
 use App\Repository\ExchangeRateRepository;
@@ -8,7 +10,8 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: ExchangeRateRepository::class)]
 #[ORM\Table(name: 'exchange_rates')]
-#[ORM\UniqueConstraint(name: 'unique_rate_idx', columns: ['date', 'currency', 'base_currency'])]
+#[ORM\UniqueConstraint(name: 'unique_rate_idx', columns: ['date', 'currency', 'base_currency', 'source_id'])]
+#[ORM\Index(name: 'date_idx', columns: ['date'])]
 class ExchangeRate
 {
     #[ORM\Id]
@@ -27,6 +30,9 @@ class ExchangeRate
 
     #[ORM\Column(type: Types::DECIMAL, precision: 20, scale: 8)]
     private ?string $rate = null;
+
+    #[ORM\Column(type: Types::INTEGER, options: ['default' => 1])]
+    private int $sourceId = 1;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private ?\DateTimeImmutable $createdAt = null;
@@ -85,6 +91,18 @@ class ExchangeRate
     public function setRate(string $rate): static
     {
         $this->rate = $rate;
+
+        return $this;
+    }
+
+    public function getSourceId(): int
+    {
+        return $this->sourceId;
+    }
+
+    public function setSourceId(int $sourceId): static
+    {
+        $this->sourceId = $sourceId;
 
         return $this;
     }

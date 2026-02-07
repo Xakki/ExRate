@@ -1,6 +1,6 @@
 framework:
     rate_limiter:
-        global_fetch_rate:
+        cbr:
             policy: 'fixed_window'
             limit: 1
             interval: '1 seconds'

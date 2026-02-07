@@ -1,48 +1,84 @@
 {
-  "mcpServers": {
-    "database": {
-      "command": "uvx",
-      "args": [
-        "--from",
-        "mysql-mcp-server",
-        "mysql_mcp_server"
-      ],
-      "env": {
-        "MYSQL_HOST": "localhost",
-        "MYSQL_PORT": "3306",
-        "MYSQL_USER": "exrate",
-        "MYSQL_PASSWORD": "123456",
-        "MYSQL_DATABASE": "exrate"
-      }
-
-    },
-    "docker": {
-      "command":"docker",
-      "args":["mcp","gateway", "run"]
-    },
-    "redis": {
-      "command": "uvx",
-      "args": [
-        "--from",
-        "redis-mcp-server@latest", "redis-mcp-server",
-        "--host", "localhost",
-        "--port", "6379",
-        "--password", ""
-      ]
-    },
-    "fetch": {
-      "command": "uvx",
-      "args": [
-        "mcp-server-fetch"
-      ]
-    },
-    "git": {
-      "command": "uvx",
-      "args": [
-        "mcp-server-git",
-        "--repository",
-        "/Users/xakkim/www/exrate"
-      ]
+    "mcpServers": {
+        "make-disabled": {
+            "command": "uvx",
+            "args": [
+                "mcp-server-make",
+                "--make-path",
+                "Makefile",
+                "--working-dir",
+                "/var/www/xakki/exrate"
+            ],
+            "env": {
+                "MCP_REQUEST_TIMEOUT": "300"
+            }
+        },
+        "make-exrate": {
+            "command": "/var/www/vendors/mcp-server-make/.venv/bin/python",
+            "args": [
+                "-m",
+                "mcp_server_make",
+                "--working-dir",
+                "/var/www/xakki/exrate"
+            ],
+            "env": {
+                "MCP_REQUEST_TIMEOUT": "600"
+            }
+        },
+        "database": {
+            "command": "uvx",
+            "args": [
+                "--from",
+                "mysql-mcp-server",
+                "mysql_mcp_server"
+            ],
+            "env": {
+                "MYSQL_HOST": "localhost",
+                "MYSQL_PORT": "3306",
+                "MYSQL_USER": "exrate",
+                "MYSQL_PASSWORD": "123456",
+                "MYSQL_DATABASE": "exrate"
+            }
+        },
+        "docker": {
+            "command": "uvx",
+            "args": [
+                "docker-mcp"
+            ],
+            "env": {
+                "MCP_REQUEST_TIMEOUT": "600"
+            }
+        },
+        "redis": {
+            "command": "uvx",
+            "args": [
+                "--from",
+                "redis-mcp-server@latest",
+                "redis-mcp-server",
+                "--host",
+                "localhost",
+                "--port",
+                "6379",
+                "--password",
+                ""
+            ]
+        },
+        "fetch": {
+            "command": "uvx",
+            "args": [
+                "mcp-server-fetch"
+            ],
+            "env": {
+                "MCP_REQUEST_TIMEOUT": "300"
+            }
+        },
+        "git": {
+            "command": "uvx",
+            "args": [
+                "mcp-server-git",
+                "--repository",
+                "/var/www/xakki/exrate"
+            ]
+        }
     }
-  }
 }
