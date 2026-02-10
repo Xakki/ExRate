@@ -18,6 +18,8 @@ services:
       - sock:/run/appsock
     env_file:
       - .env_dist
+      - path: .env
+        required: false
     environment:
       UID: ${UID:-0}
       GID: ${GID:-0}

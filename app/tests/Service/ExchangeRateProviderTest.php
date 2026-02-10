@@ -67,6 +67,7 @@ class ExchangeRateProviderTest extends TestCase
                 if ($key === $rateKey) {
                     return $cachedResponse;
                 }
+
                 return null;
             });
 
@@ -108,6 +109,7 @@ class ExchangeRateProviderTest extends TestCase
                 if ($argDate->format('Y-m-d') === $date->modify('-1 day')->format('Y-m-d')) {
                     return $previousRateEntity;
                 }
+
                 return null;
             });
 

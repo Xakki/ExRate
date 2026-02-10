@@ -1,68 +1,110 @@
-name: ProfMatrix Tests
+name: ExRate test
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    push:
+        branches: [ main ]
+    pull_request:
+        branches: [ main ]
 
 env:
-  APP_ENV: "test"
-  MACHINE_NAME: "github-test"
+    COMPOSER_NO_INTERACTION: "1"
+    COMPOSER_MEMORY_LIMIT: "1G"
+    COMPOSER_PROCESS_TIMEOUT: "600"
+    APP_ENV: "test"
+    DEFAULT_URI: http://localhost
+    APP_SECRET: changeme
+    FETCH_RATE_INTERVAL: 2
+    CURRENCY_PRECISION: 8
+    REDIS_URL: redis://127.0.0.1:6379
+    MARIADB_HOST: 127.0.0.1:3306
+    MARIADB_DATABASE: exrate-test
+    MARIADB_TEST_DATABASE: exrate-test
+    MARIADB_USER: exrate
+    MARIADB_PASSWORD: 123456
+    MARIADB_ROOT_PASSWORD: 123456
+    TZ: UTC
+
+defaults:
+    run:
+        working-directory: ./app
 
 jobs:
-  tests:
-    runs-on: self-hosted
-    steps:
+    tests:
+        runs-on: ubuntu-latest
+        services:
+            database:
+                image: mariadb:11
+                env:
+                    MARIADB_DATABASE: exrate-test
+                    MARIADB_USER: exrate
+                    MARIADB_PASSWORD: 123456
+                    MARIADB_ROOT_PASSWORD: 123456
+                ports:
+                    - 3306:3306
+                options: >-
+                    --health-cmd="healthcheck.sh --connect --innodb_initialized"
+                    --health-interval=10s
+                    --health-timeout=5s
+                    --health-retries=3
+                    --tmpfs /var/lib/mysql
 
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          clean: false
+            cache:
+                image: eqalpha/keydb:latest
+                ports:
+                    - 6379:6379
+                options: >-
+                    --health-cmd="keydb-cli ping"
+                    --health-interval=10s
+                    --health-timeout=5s
+                    --health-retries=5
 
-      - name: Cache Composer dependencies
-        uses: actions/cache@v4
-        with:
-          path: laravel/vendor
-          key: ${{ runner.os }}-vendor-${{ hashFiles('laravel/composer.lock') }}
-          restore-keys: ${{ runner.os }}-vendor-
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
 
-      - name: Up dockers
-        run: |
-            make composer-install
-            make up
-        timeout-minutes: 5
+            - name: Setup PHP
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.5'
+                  tools: composer:v2
+                  coverage: none
+                  extensions: ctype, iconv, simplexml, redis, bcmath
 
-      - name: Logs if up failed
-        if: ${{ steps.up.outcome == 'failure' }}
-        run: |
-            make ps
-            make logs name=php
+            - name: Get Composer Cache Directory
+              id: composer-cache
+              run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
 
-      - name: Run PHPStan
-        run: |
-          make phpstan
-        timeout-minutes: 5
+            - name: Cache Composer dependencies
+              uses: actions/cache@v4
+              with:
+                  path: ${{ steps.composer-cache.outputs.dir }}
+                  key: ${{ runner.os }}-composer-${{ hashFiles('app/composer.lock') }}
+                  restore-keys: ${{ runner.os }}-composer-
 
-      - name: Run PHPCS
-        run: |
-          make cs-check
-        timeout-minutes: 5
+            - name: Install dependencies
+              run: composer install --prefer-dist --no-ansi --no-progress
+              timeout-minutes: 5
 
-      - name: Run Unit Tests
-        run: make test
-        timeout-minutes: 5
+            - name: Run PHPStan
+              run: composer test:phpstan
+              timeout-minutes: 1
 
-      - name: Down dockers
-        if: always()
-        run: make down
-        timeout-minutes: 1
-        continue-on-error: true
+            - name: Run PHPCS
+              run: composer test:cs-check
+              timeout-minutes: 1
 
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ github.sha }}
-          path: app/report.xml
-          retention-days: 7
+            - name: Prepare Database
+              run: composer migrate
+              timeout-minutes: 1
+
+            - name: Run Unit Tests
+              run: composer test:unit
+              timeout-minutes: 1
+
+            - name: Upload test results
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: test-report-${{ github.sha }}
+                  path: app/report.xml
+                  retention-days: 7
