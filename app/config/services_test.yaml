@@ -1,3 +1,12 @@
+imports:
+    - { resource: services.yaml }
+
+parameters:
+    default_log_stream: "%kernel.logs_dir%/%kernel.environment%_default.log"
+
 services:
-    App\Service\ExchangeRateProvider:
+    _defaults:
         public: true
+    Symfony\Component\Messenger\MessageBusInterface: '@messenger.bus.default'
+    App\Contract\Cache\RateCacheInterface: '@App\Cache\RateCache'
+    App\Contract\Cache\SkipDayCacheInterface: '@App\Cache\SkipDayCache'

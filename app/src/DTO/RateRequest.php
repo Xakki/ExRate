@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\DTO;
 
-use App\Enum\RateSource;
+use App\Enum\ProviderEnum;
 use OpenApi\Attributes as OA;
 use Symfony\Component\Serializer\Attribute\Ignore;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -28,9 +28,9 @@ class RateRequest
     #[OA\Property(description: 'Base currency code (ISO 4217)', maxLength: 3, minLength: 3, example: 'RUB')]
     public string $baseCurrency = 'RUB';
 
-    #[Assert\Choice(callback: [RateSource::class, 'cases'])]
-    #[OA\Property(description: 'Rate source', type: 'string', enum: [RateSource::CBR])]
-    public RateSource $source = RateSource::CBR;
+    #[Assert\Choice(callback: [ProviderEnum::class, 'cases'])]
+    #[OA\Property(description: 'Data provider', type: 'string', enum: [ProviderEnum::CBR])]
+    public ProviderEnum $provider = ProviderEnum::CBR;
 
     #[Assert\Callback]
     public function validateDateRange(ExecutionContextInterface $context): void
@@ -65,8 +65,16 @@ class RateRequest
     #[Ignore]
     public function getDateImmutable(): \DateTimeImmutable
     {
-        return $this->date
-            ? \DateTimeImmutable::createFromFormat('Y-m-d', $this->date)->setTime(0, 0)
-            : new \DateTimeImmutable('today');
+        if (null === $this->date) {
+            return new \DateTimeImmutable('today');
+        }
+
+        $parsedDate = \DateTimeImmutable::createFromFormat('Y-m-d', $this->date);
+
+        if (false === $parsedDate) {
+            return new \DateTimeImmutable('today');
+        }
+
+        return $parsedDate->setTime(0, 0);
     }
 }

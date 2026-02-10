@@ -1,7 +1,5 @@
 parameters:
-    level: 6
+    level: 7
     paths:
-        - config/
-        - public/
         - src/
         - tests/

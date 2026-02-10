@@ -45,7 +45,7 @@ services:
   nginx:
     image: nginx:alpine
     restart: unless-stopped
-    stop_grace_period: 5s
+    stop_grace_period: 15s
     stop_signal: SIGTERM
     working_dir: /app/public
     ports:

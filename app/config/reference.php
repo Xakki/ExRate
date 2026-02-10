@@ -1120,6 +1120,38 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         },
  *     }>,
  * }
+ * @psalm-type FdLogViewerConfig = array{
+ *     home_route?: scalar|Param|null, // The name of the route to redirect to when clicking the back button
+ *     show_performance_details?: scalar|Param|null, // Will toggle if the performance information and version will be shown. Default true // Default: true
+ *     log_files?: array<string, array{ // Default: {"monolog":{"type":"monolog","name":"Monolog","finder":{"in":"%kernel.logs_dir%","name":"*.log","depth":"== 0","ignoreUnreadableDirs":true,"followLinks":false},"downloadable":false,"deletable":false,"start_of_line_pattern":"/^\\[\\d{4}-\\d{2}-\\d{2}[^]]*]\\s+\\S+\\.\\S+:/","log_message_pattern":"/^\\[(?P<date>[^\\]]+)\\]\\s+(?P<channel>[^\\.]+)\\.(?P<severity>[^:]+):\\s+(?P<message>.*)\\s+(?P<context>(?:{.*?}|\\[.*?]))\\s+(?P<extra>(?:{.*?}|\\[.*?]))\\s+$/s","date_format":null}}
+ *         type?: scalar|Param|null, // The type of log file: monolog, nginx, apache, or the service id of an implementation of `LogFileParserInterface`
+ *         name?: scalar|Param|null, // The pretty name to show for these log files
+ *         finder: array{
+ *             in?: scalar|Param|null, // The symfony/finder pattern to iterate through directories. Example: %kernel.logs_dir%
+ *             name?: scalar|Param|null, // The symfony/finder pattern to filter files. Example: *.log // Default: null
+ *             depth?: scalar|Param|null, // The symfony/finder directory depth to search files for. Example: '> 0' // Default: null
+ *             ignoreUnreadableDirs?: scalar|Param|null, // Whether to ignore unreadable directories // Default: true
+ *             followLinks?: scalar|Param|null, // Whether to follow symlinks // Default: false
+ *         },
+ *         open?: array{
+ *             pattern: scalar|Param|null, // A pattern to match a log file. Use * as wildcard. Example: dev-*.log
+ *             order?: scalar|Param|null, // Either "newest" or "oldest". Defaults to "newest" // Default: "newest"
+ *         },
+ *         downloadable?: scalar|Param|null, // Whether or not to allow downloading of the log file // Default: false
+ *         deletable?: scalar|Param|null, // Whether or not to allow deletion of the log file // Default: false
+ *         start_of_line_pattern?: scalar|Param|null, // The regex pattern for the start of a log line. Adds support for multiline log messages. // Default: null
+ *         log_message_pattern?: scalar|Param|null, // The regex pattern for a full log message which could include newlines. // Default: null
+ *         date_format?: scalar|Param|null, // The date format to parse the date from the log entry. If set to `null`, the format will be guessed by `strtotime` // Default: null
+ *     }>,
+ *     hosts?: array<string, array{ // Default: {"localhost":{"name":"Local","host":null}}
+ *         name?: scalar|Param|null, // The pretty name to show for this host
+ *         host?: scalar|Param|null, // The host to connect to // Default: null
+ *         auth?: array{
+ *             type: scalar|Param|null, // An implementation of AuthenticatorInterface
+ *             options?: array<string, scalar|Param|null>,
+ *         },
+ *     }>,
+ * }
  * @psalm-type ConfigType = array{
  *     imports?: ImportsConfig,
  *     parameters?: ParametersConfig,
@@ -1141,6 +1173,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         nelmio_api_doc?: NelmioApiDocConfig,
  *         twig?: TwigConfig,
  *         monolog?: MonologConfig,
+ *         fd_log_viewer?: FdLogViewerConfig,
  *     },
  *     "when@prod"?: array{
  *         imports?: ImportsConfig,

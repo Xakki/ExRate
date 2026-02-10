@@ -1,6 +1,9 @@
 parameters:
     fetch_rate_interval: '%env(int:FETCH_RATE_INTERVAL)%'
     currency_precision: '%env(int:CURRENCY_PRECISION)%'
+    default_log_stream: 'php://stderr'
+    monolog.handlers.file_log.path: "%kernel.logs_dir%/%kernel.environment%_errors.log"
+    #default_log_stream: "%kernel.logs_dir%/%kernel.environment%.log"
 
 services:
     _defaults:
@@ -10,30 +13,234 @@ services:
             $currencyPrecision: '%currency_precision%'
 
     _instanceof:
-        App\Contract\RateSourceInterface:
-            tags: ['app.rate_source']
-
-    App\:
-        resource: '../src/'
-        exclude:
-            - '../src/DependencyInjection/'
-            - '../src/Entity/'
-            - '../src/Kernel.php'
-            - '../src/Service/ExchangeRateService.php'
-
-    App\Contract\CacheManagerInterface:
-        alias: App\Service\CacheManager
-
-    App\Service\RateSourceRegistry:
-        arguments:
-            $locator: !tagged_locator { tag: 'app.rate_source', default_index_method: 'getServiceName' }
-
-    App\Service\RateSource\CbrRateSource:
-        arguments:
-            $id: 1
-            $url: 'https://cbr.ru/scripts/XML_daily.asp'
-            $currencyPrecision: 8
+        App\Contract\ProviderInterface:
+            tags: ['app.provider']
 
     test.service_container:
         alias: service_container
         public: true
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/Entity/'
+            - '../src/Kernel.php'
+
+    App\Repository\ExchangeRateRepository:
+        public: true
+
+    App\Service\ProviderRegistry:
+        public: true
+
+    # Cache configs
+
+    ## Example cache: with namespace (Dont touch)
+    #app.cache.adapter.example_cache:
+    #    parent: 'cache.adapter.redis'
+    #    tags:
+    #        - { name: 'cache.pool', namespace: '%env(REDIS_URL)%:example' }
+
+    app.cache.default:
+        parent: 'cache.app'
+        tags:
+            - { name: 'cache.pool', namespace: '%env(APP_ENV)%' }
+
+    App\Contract\Cache\RateCacheInterface: '@App\Cache\RateCache'
+    App\Contract\Cache\SkipDayCacheInterface: '@App\Cache\SkipDayCache'
+    App\Contract\Cache\TimeseriesCacheInterface: '@App\Cache\TimeseriesCache'
+    App\Contract\Cache\RateLimitCacheInterface: '@App\Cache\RateLimitCache'
+
+    App\Cache\RateCache:
+        arguments:
+            $cacheItemPool: '@first_cache'
+
+    App\Cache\SkipDayCache:
+        arguments:
+            $cacheItemPool: '@second_cache'
+
+    App\Cache\TimeseriesCache:
+        arguments:
+            $cacheItemPool: '@third_cache'
+
+    App\Cache\RateLimitCache:
+        arguments:
+            $cacheItemPool: '@fourth_cache'
+
+
+    # Providers
+    App\Provider\CbrProvider:
+        arguments:
+            $id: 1
+            $url: 'https://cbr.ru/scripts/XML_daily.asp'
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.cbr' }
+
+    App\Provider\EcbProvider:
+        arguments:
+            $id: 2
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.ecb' }
+
+    App\Provider\NbrProvider:
+        arguments:
+            $id: 3
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.nbr' }
+
+    App\Provider\CbrtProvider:
+        arguments:
+            $id: 4
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.cbrt' }
+
+    App\Provider\CnbProvider:
+        arguments:
+            $id: 5
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.cnb' }
+
+    App\Provider\RcbProvider:
+        arguments:
+            $id: 6
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.rcb' }
+
+    App\Provider\BnbProvider:
+        arguments:
+            $id: 7
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.bnb' }
+
+    App\Provider\NbuProvider:
+        arguments:
+            $id: 8
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.nbu' }
+
+    App\Provider\NbgProvider:
+        arguments:
+            $id: 9
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.nbg' }
+
+    App\Provider\OpenExchangeRatesProvider:
+        arguments:
+            $id: 10
+            $appId: '%env(OPEN_EXCHANGE_RATES_APP_ID)%'
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.open_exchange_rates' }
+
+    App\Provider\CurrencyLayerProvider:
+        arguments:
+            $id: 12
+            $accessKey: '%env(CURRENCY_LAYER_ACCESS_KEY)%'
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.currency_layer' }
+
+    App\Provider\CoinLayerProvider:
+        arguments:
+            $id: 13
+            $accessKey: '%env(COIN_LAYER_ACCESS_KEY)%'
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.coin_layer' }
+
+    App\Provider\ApiLayerFixerProvider:
+        arguments:
+            $id: 14
+            $apiKey: '%env(API_LAYER_FIXER_API_KEY)%'
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.api_layer_fixer' }
+
+    App\Provider\ApiLayerCurrencyDataProvider:
+        arguments:
+            $id: 15
+            $apiKey: '%env(API_LAYER_CURRENCY_DATA_API_KEY)%'
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.api_layer_currency_data' }
+
+    App\Provider\ApiLayerExchangeRatesDataProvider:
+        arguments:
+            $id: 16
+            $apiKey: '%env(API_LAYER_EXCHANGE_RATES_DATA_API_KEY)%'
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.api_layer_exchange_rates_data' }
+
+    App\Provider\ExchangeRatesApiProvider:
+        arguments:
+            $id: 17
+            $accessKey: '%env(EXCHANGE_RATES_API_ACCESS_KEY)%'
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.exchange_rates_api' }
+
+    App\Provider\FastForexProvider:
+        arguments:
+            $id: 18
+            $apiKey: '%env(FASTFOREX_API_KEY)%'
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.fast_forex' }
+
+    App\Provider\ForgeProvider:
+        arguments:
+            $id: 19
+            $apiKey: '%env(FORGE_API_KEY)%'
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.forge' }
+
+    App\Provider\XchangeApiProvider:
+        arguments:
+            $id: 20
+            $apiKey: '%env(XCHANGE_API_KEY)%'
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.xchange_api' }
+
+    App\Provider\XigniteProvider:
+        arguments:
+            $id: 21
+            $token: '%env(XIGNITE_TOKEN)%'
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.xignite' }
+
+    App\Provider\CurrencyDataFeedProvider:
+        arguments:
+            $id: 22
+            $token: '%env(CURRENCY_DATA_FEED_TOKEN)%'
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.currency_data_feed' }
+
+    App\Provider\CurrencyConverterProvider:
+        arguments:
+            $id: 23
+            $apiKey: '%env(CURRENCY_CONVERTER_API_KEY)%'
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.currency_converter' }
+
+    App\Provider\AbstractApiProvider:
+        arguments:
+            $id: 24
+            $apiKey: '%env(ABSTRACT_API_KEY)%'
+            $currencyPrecision: 8
+        tags:
+            - { name: 'app.provider', key: 'provider.abstract_api' }
+

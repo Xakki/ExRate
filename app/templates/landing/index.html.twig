@@ -1,0 +1,189 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Exchange Rate API{% endblock %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" href="{{ asset('css/landing.css') }}">
+{% endblock %}
+
+{% block body %}
+    <section class="container">
+        <header>
+            <h1>Exchange Rate API</h1>
+            <p>Your reliable source for exchange rates. Fast, simple, and free.</p>
+            <div class="text-center docs-link">
+                <a href="/api" class="btn">View API Documentation</a>
+            </div>
+        </header>
+
+        <section class="controls-main">
+            <div class="control-group">
+                <label for="provider_select">Provider</label>
+                <select id="provider_select" name="provider_select"></select>
+            </div>
+            <div class="control-group">
+                <label for="base_currency">Global Base Currency</label>
+                <select id="base_currency" name="base_currency"></select>
+            </div>
+            <div class="control-group">
+                <label>Add Currency</label>
+                <div class="add-pair-controls">
+                    <select id="currency" name="currency"></select>
+                    <button id="add-pair-btn" title="Add currency pair">+</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="active-pairs-container">
+            <ul id="active-pairs-list"></ul>
+        </section>
+
+        <div id="chart-container">
+            <canvas id="rate-chart"></canvas>
+        </div>
+
+        <section class="controls-secondary">
+             <div class="date-presets">
+                <button class="preset-btn" data-period="week">1W</button>
+                <button class="preset-btn" data-period="month">1M</button>
+                <button class="preset-btn" data-period="6-months">6M</button>
+                <button class="preset-btn" data-period="year">1Y</button>
+                <button class="preset-btn" data-period="5-years">5Y</button>
+            </div>
+            <div class="date-range">
+                <input type="date" id="start_date" name="start_date" title="Start Date">
+                <span>-</span>
+                <input type="date" id="end_date" name="end_date" title="End Date">
+                <button id="update-range-btn">Update</button>
+            </div>
+        </section>
+
+        <section>
+
+            <h2>Integration Examples</h2>
+            <div class="tabs">
+                <button class="tab-button active" onclick="openTab(event, 'php')">PHP</button>
+                <button class="tab-button" onclick="openTab(event, 'python')">Python</button>
+                <button class="tab-button" onclick="openTab(event, 'nodejs')">Node.js</button>
+                <button class="tab-button" onclick="openTab(event, 'golang')">Go</button>
+            </div>
+
+            <div id="php" class="tab-content active">
+                <h3>PHP Example</h3>
+                <pre><code>
+$client = new HttpClient();
+$date = new DateTimeImmutable();
+$currency = 'USD';
+$baseCurrency = 'EUR';
+
+$url = sprintf(
+    'https://exrate.xakki.pro/api/v1/rate?date=%s&currency=%s&baseCurrency=%s',
+    $date->format('Y-m-d'),
+    $currency,
+    $baseCurrency
+);
+
+$response = $client->request('GET', $url);
+
+if ($response->getStatusCode() === 200) {
+    $data = $response->toArray();
+    echo "Rate: " . $data['rate'];
+}
+            </code></pre>
+            </div>
+
+            <div id="python" class="tab-content">
+                <h3>Python Example</h3>
+                <pre><code>
+import requests
+from datetime import datetime
+
+date = datetime.now().strftime('%Y-%m-%d')
+currency = 'USD'
+base_currency = 'EUR'
+
+url = f'https://exrate.xakki.pro/api/v1/rate?date={date}&currency={currency}&baseCurrency={base_currency}'
+
+response = requests.get(url)
+
+if response.status_code == 200:
+    data = response.json()
+    print(f"Rate: {data['rate']}")
+            </code></pre>
+            </div>
+
+            <div id="nodejs" class="tab-content">
+                <h3>Node.js Example</h3>
+                <pre><code>
+const fetch = require('node-fetch');
+
+const date = new Date().toISOString().slice(0, 10);
+const currency = 'USD';
+const baseCurrency = 'EUR';
+
+const url = `https://exrate.xakki.pro/api/v1/rate?date=${date}&currency=${currency}&baseCurrency=${baseCurrency}`;
+
+fetch(url)
+    .then(res => {
+        if (res.status === 200) {
+            return res.json();
+        }
+    })
+    .then(data => {
+        if (data) {
+            console.log(`Rate: ${data.rate}`);
+        }
+    });
+            </code></pre>
+            </div>
+
+            <div id="golang" class="tab-content">
+                <h3>Go Example</h3>
+                <pre><code>
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"io/ioutil"
+	"time"
+	"encoding/json"
+)
+
+func main() {
+	date := time.Now().Format("2006-01-02")
+	currency := "USD"
+	baseCurrency := "EUR"
+
+	url := fmt.Sprintf("https://exrate.xakki.pro/api/v1/rate?date=%s&currency=%s&baseCurrency=%s", date, currency, baseCurrency)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		// handle error
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			// handle error
+		}
+
+		var result map[string]interface{}
+		json.Unmarshal(body, &result)
+
+		fmt.Printf("Rate: %v
+", result["rate"])
+	}
+}
+            </code></pre>
+            </div>
+        </section>
+    </div>
+{% endblock %}
+
+{% block javascripts %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="{{ asset('js/landing.js') }}"></script>
+{% endblock %}

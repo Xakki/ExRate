@@ -6,7 +6,7 @@ namespace App\Exception;
 
 use Symfony\Component\HttpKernel\Attribute\WithHttpStatus;
 
-#[WithHttpStatus(503)]
+#[WithHttpStatus(202, ['Retry-After' => '5'])]
 class RateNotFoundException extends \RuntimeException
 {
     public function __construct(string $currency, string $baseCurrency)

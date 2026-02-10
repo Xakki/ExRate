@@ -35,6 +35,15 @@
             "migrations/.gitignore"
         ]
     },
+    "fdekker/log-viewer-bundle": {
+        "version": "2.7",
+        "recipe": {
+            "repo": "github.com/symfony/recipes-contrib",
+            "branch": "main",
+            "version": "1.0",
+            "ref": "42ff59ae742719fe7c26b7a988e8d757a15b2524"
+        }
+    },
     "friendsofphp/php-cs-fixer": {
         "version": "3.93",
         "recipe": {

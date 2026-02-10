@@ -8,11 +8,13 @@
     "prefer-stable": true,
     "require": {
         "php": "^8.5",
+        "ext-apcu": "*",
+        "ext-bcmath": "*",
         "ext-ctype": "*",
         "ext-iconv": "*",
-        "ext-simplexml": "*",
+        "ext-pcntl": "*",
         "ext-redis": "*",
-        "ext-bcmath": "*",
+        "ext-simplexml": "*",
         "doctrine/doctrine-bundle": "^3.0",
         "doctrine/doctrine-migrations-bundle": "^4",
         "doctrine/orm": "^3.6",
@@ -40,6 +42,7 @@
     },
     "require-dev": {
         "dg/bypass-finals": "^1.8",
+        "fdekker/log-viewer-bundle": "^2.7",
         "friendsofphp/php-cs-fixer": "^3.93",
         "phpstan/phpstan": "^2.0",
         "phpunit/phpunit": "^12.5",
@@ -49,11 +52,15 @@
     },
     "config": {
         "allow-plugins": {
-            "php-http/discovery": true,
             "symfony/flex": true,
             "symfony/runtime": true
         },
-        "sort-packages": true
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true,
+        "platform": {
+            "php": "8.5"
+        }
     },
     "autoload": {
         "psr-4": {
@@ -82,13 +89,17 @@
             "composer dump-autoload",
             "composer migrate"
         ],
-        "migrate": "bin/console doctrine:migrations:migrate --no-interaction",
-        "test:phpstan": "APP_ENV=testing XDEBUG_MODE=off vendor/bin/phpstan analyse --memory-limit 1G -v",
-        "test:phpstan-basefile": "APP_ENV=testing XDEBUG_MODE=off vendor/bin/phpstan analyse --memory-limit 1G -v --generate-baseline=phpstan-baseline.neon",
+        "migrate": "bin/console doctrine:migrations:migrate -n",
+        "test:migrate": "bin/console doctrine:migrations:migrate -n -e test",
+        "test:phpstan": "XDEBUG_MODE=off vendor/bin/phpstan analyse --memory-limit 1G -v",
+        "test:phpstan-basefile": "XDEBUG_MODE=off vendor/bin/phpstan analyse --memory-limit 1G -v --generate-baseline=phpstan-baseline.neon",
         "test:phpstan-clean": "XDEBUG_MODE=off vendor/bin/phpstan clear-result-cache",
         "test:cs-check": "XDEBUG_MODE=off vendor/bin/php-cs-fixer check",
         "test:cs-fix": "XDEBUG_MODE=off vendor/bin/php-cs-fixer fix",
-        "test:unit": "XDEBUG_MODE=off bin/phpunit --log-junit report.xml"
+        "test": "XDEBUG_MODE=off APP_ENV=test bin/phpunit --log-junit report.xml",
+        "test:unit": "XDEBUG_MODE=off APP_ENV=test bin/phpunit --testsuite unit --log-junit report_unit.xml",
+        "test:integration": "XDEBUG_MODE=off APP_ENV=test bin/phpunit --testsuite integration --log-junit report_integration.xml",
+        "test:functional": "XDEBUG_MODE=off APP_ENV=test bin/phpunit --testsuite functional --log-junit report_functional.xml"
     },
     "conflict": {
         "symfony/symfony": "*"

@@ -10,6 +10,7 @@ env:
     COMPOSER_NO_INTERACTION: "1"
     COMPOSER_MEMORY_LIMIT: "1G"
     COMPOSER_PROCESS_TIMEOUT: "600"
+    XDEBUG_MODE: "off"
     APP_ENV: "test"
     DEFAULT_URI: http://localhost
     APP_SECRET: changeme
@@ -94,11 +95,19 @@ jobs:
               timeout-minutes: 1
 
             - name: Prepare Database
-              run: composer migrate
+              run: composer test:migrate
               timeout-minutes: 1
 
             - name: Run Unit Tests
               run: composer test:unit
+              timeout-minutes: 1
+
+            - name: Run Unit Tests
+              run: bin/phpunit --testsuite unit --log-junit report_unit.xml
+              timeout-minutes: 1
+
+            - name: Run Functional Tests
+              run: bin/phpunit --testsuite functional --log-junit report_functional.xml
               timeout-minutes: 1
 
             - name: Upload test results
@@ -106,5 +115,5 @@ jobs:
               uses: actions/upload-artifact@v4
               with:
                   name: test-report-${{ github.sha }}
-                  path: app/report.xml
+                  path: report*.xml
                   retention-days: 7

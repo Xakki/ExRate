@@ -4,15 +4,22 @@ monolog:
     handlers:
         file_log:
             type: stream
-            path: "%kernel.logs_dir%/app.log"
-            level: debug
+            path: "%monolog.handlers.file_log.path%"
+            level: notice
+        console:
+            type:   console
+            process_psr_3_messages: false
+            channels: ['!event', '!doctrine', '!console']
+            interactive_only: true
 
 when@dev:
     monolog:
         handlers:
             main:
                 type: stream
-                path: "%kernel.logs_dir%/%kernel.environment%.log"
+                path: "%env(default:default_log_stream:MONOLOG_LOG_STREAM)%"
+                #path: php://stderr
+                #path: "%kernel.logs_dir%/%kernel.environment%.log"
                 level: debug
                 channels: ["!event"]
             console:
@@ -27,12 +34,13 @@ when@test:
                 type: fingers_crossed
                 action_level: error
                 handler: nested
-                excluded_http_codes: [404, 405]
                 channels: ["!event"]
             nested:
                 type: stream
-                path: "%kernel.logs_dir%/%kernel.environment%.log"
-                level: debug
+                path: "%env(default:default_log_stream:MONOLOG_LOG_STREAM)%"
+                #path: php://stderr
+                #path: "%kernel.logs_dir%/%kernel.environment%.log"
+                level: info
 
 when@prod:
     monolog:
@@ -46,8 +54,9 @@ when@prod:
                 buffer_size: 50 # How many messages should be saved? Prevent memory leaks
             nested:
                 type: stream
-                path: php://stderr
-                level: debug
+                path: "%env(default:default_log_stream:MONOLOG_LOG_STREAM)%"
+                #path: php://stderr
+                level: notice
                 formatter: monolog.formatter.json
             console:
                 type: console

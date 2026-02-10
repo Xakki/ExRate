@@ -10,7 +10,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: ExchangeRateRepository::class)]
 #[ORM\Table(name: 'exchange_rates')]
-#[ORM\UniqueConstraint(name: 'unique_rate_idx', columns: ['date', 'currency', 'base_currency', 'source_id'])]
+#[ORM\UniqueConstraint(name: 'unique_rate_idx', columns: ['date', 'currency', 'base_currency', 'provider_id'])]
 #[ORM\Index(name: 'date_idx', columns: ['date'])]
 class ExchangeRate
 {
@@ -19,26 +19,25 @@ class ExchangeRate
     #[ORM\Column]
     private ?int $id = null; // @phpstan-ignore-line
 
-    #[ORM\Column(type: Types::DATE_IMMUTABLE)]
-    private ?\DateTimeImmutable $date = null;
-
-    #[ORM\Column(length: 3)]
-    private ?string $currency = null;
-
-    #[ORM\Column(length: 3)]
-    private ?string $baseCurrency = null;
-
-    #[ORM\Column(type: Types::DECIMAL, precision: 20, scale: 8)]
-    private ?string $rate = null;
-
-    #[ORM\Column(type: Types::INTEGER, options: ['default' => 1])]
-    private int $sourceId = 1;
-
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
-    private ?\DateTimeImmutable $createdAt = null;
+    private \DateTimeImmutable $createdAt;
 
-    public function __construct()
-    {
+    public function __construct(
+        #[ORM\Column(type: Types::DATE_IMMUTABLE)]
+        private \DateTimeImmutable $date,
+
+        #[ORM\Column(length: 3)]
+        private string $currency,
+
+        #[ORM\Column(length: 3)]
+        private string $baseCurrency,
+
+        #[ORM\Column(type: Types::DECIMAL, precision: 20, scale: 8)]
+        private string $rate,
+
+        #[ORM\Column(type: Types::INTEGER, options: ['default' => 1])]
+        private int $providerId = 1,
+    ) {
         $this->createdAt = new \DateTimeImmutable();
     }
 
@@ -47,7 +46,7 @@ class ExchangeRate
         return $this->id;
     }
 
-    public function getDate(): ?\DateTimeImmutable
+    public function getDate(): \DateTimeImmutable
     {
         return $this->date;
     }
@@ -59,7 +58,7 @@ class ExchangeRate
         return $this;
     }
 
-    public function getCurrency(): ?string
+    public function getCurrency(): string
     {
         return $this->currency;
     }
@@ -71,7 +70,7 @@ class ExchangeRate
         return $this;
     }
 
-    public function getBaseCurrency(): ?string
+    public function getBaseCurrency(): string
     {
         return $this->baseCurrency;
     }
@@ -83,7 +82,7 @@ class ExchangeRate
         return $this;
     }
 
-    public function getRate(): ?string
+    public function getRate(): string
     {
         return $this->rate;
     }
@@ -95,19 +94,19 @@ class ExchangeRate
         return $this;
     }
 
-    public function getSourceId(): int
+    public function getProviderId(): int
     {
-        return $this->sourceId;
+        return $this->providerId;
     }
 
-    public function setSourceId(int $sourceId): static
+    public function setProviderId(int $providerId): static
     {
-        $this->sourceId = $sourceId;
+        $this->providerId = $providerId;
 
         return $this;
     }
 
-    public function getCreatedAt(): ?\DateTimeImmutable
+    public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;
     }

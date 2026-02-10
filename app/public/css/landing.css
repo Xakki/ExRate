@@ -1,0 +1,57 @@
+:root {
+    --primary-color: #007bff;
+    --danger-color: #dc3545;
+    --light-gray: #f8f9fa;
+    --medium-gray: #e9ecef;
+    --dark-gray: #6c757d;
+    --text-color: #343a40;
+    --white: #fff;
+    --border-color: #dee2e6;
+    --shadow: 0 6px 12px rgba(0,0,0,0.08);
+    --border-radius: 8px;
+}
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 0; background-color: var(--light-gray); color: var(--text-color); line-height: 1.6; }
+.container { max-width: 1400px; margin: 2rem auto; padding: 2.5rem; background-color: var(--white); border-radius: var(--border-radius); box-shadow: var(--shadow); }
+header { text-align: center; margin-bottom: 2.5rem; }
+h1 { font-size: 2.8rem; font-weight: 500; margin-bottom: 0.5rem; }
+p { font-size: 1.2rem; color: var(--dark-gray); margin: 0; }
+
+.controls-main, .controls-secondary { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; padding: 1rem 1.5rem; background-color: var(--light-gray); border-radius: var(--border-radius); margin-bottom: 1.5rem; }
+.controls-secondary { justify-content: center; padding-top: 1.5rem; margin-bottom: 0; }
+.control-group { display: flex; flex-direction: column; }
+.control-group label { font-size: 0.8rem; margin-bottom: 0.35rem; color: var(--dark-gray); font-weight: 500; }
+.control-group select, .control-group input, button {
+    padding: 0.5rem 0.7rem; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.9rem; transition: all 0.2s ease;
+}
+.control-group select:focus, .control-group input:focus { border-color: var(--primary-color); outline: 0; box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25); }
+
+.add-pair-controls { display: flex; }
+#add-pair-btn { border-top-left-radius: 0; border-bottom-left-radius: 0; font-size: 1.2rem; line-height: 1; background-color: var(--primary-color); color: var(--white); border-color: var(--primary-color); }
+#currency { border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: none; }
+
+.date-presets { display: flex; gap: 0.4rem; }
+.preset-btn { background-color: var(--medium-gray); border: 1px solid var(--border-color); color: var(--text-color); font-size: 0.85rem; }
+.preset-btn.active, .preset-btn:hover { background-color: var(--primary-color); color: var(--white); border-color: var(--primary-color); }
+.date-range { display: flex; align-items: center; gap: 0.5rem; }
+#update-range-btn { background-color: var(--primary-color); color: var(--white); border: none; }
+
+#active-pairs-container { margin-bottom: 1.5rem; min-height: 25px; }
+#active-pairs-list { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+#active-pairs-list li { display: flex; align-items: center; background-color: var(--white); border: 1px solid; padding: 0.15rem 0.6rem; border-radius: 12px; font-size: 0.75rem; font-weight: 500; }
+#active-pairs-list .remove-btn { background: var(--danger-color); color: var(--white); border: none; border-radius: 50%; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; margin-left: 0.4rem; font-weight: bold; line-height: 1; opacity: 0.7; transition: opacity 0.2s; font-size: 0.8rem;}
+#active-pairs-list .remove-btn:hover { opacity: 1; }
+
+#chart-container { position: relative; height: 60vh; width: 100%; }
+.text-center { text-align: center; }
+.docs-link { margin-top: 2.5rem; }
+.btn { display: inline-block; padding: 0.75rem 1.5rem; background-color: var(--primary-color); color: #fff; text-decoration: none; border-radius: 4px; font-size: 1rem; text-align: center; transition: background-color 0.2s; }
+.btn:hover { background-color: #0056b3; }
+
+h2 { font-size: 2rem; font-weight: 400; margin-top: 3rem; margin-bottom: 1.5rem; border-bottom: 1px solid #dee2e6; padding-bottom: 0.5rem; }
+pre { background-color: #e9ecef; padding: 1.5rem; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; font-size: 0.95rem; }
+code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace; }
+.tabs { display: flex; border-bottom: 1px solid #dee2e6; margin-bottom: 1.5rem; }
+.tab-button { background: none; border: none; padding: 1rem 1.5rem; cursor: pointer; font-size: 1rem; transition: color 0.2s, border-bottom 0.2s; color: #6c757d; border-bottom: 3px solid transparent; }
+.tab-button.active { color: #007bff; border-bottom-color: #007bff; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }

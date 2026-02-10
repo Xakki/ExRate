@@ -1,0 +1,4 @@
+when@dev:
+    fd_log_viewer:
+        resource: '@FDLogViewerBundle/Resources/config/routes.php'
+        prefix: /log-viewer

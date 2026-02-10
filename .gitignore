@@ -1,4 +1,5 @@
 .idea
+.gemini
 /.env
 .DS_Store
 /.ai/

@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Scheduler;
 
-use App\Enum\RateSource;
+use App\Enum\ProviderEnum;
 use App\Message\FetchRateMessage;
 use Symfony\Component\Scheduler\Attribute\AsSchedule;
 use Symfony\Component\Scheduler\RecurringMessage;
@@ -16,12 +18,12 @@ class MainSchedule implements ScheduleProviderInterface
     {
         $schedule = new Schedule();
         // Пример работы крона (Загрузка утреннего курса)
-        $schedule->add(
-            RecurringMessage::cron('0 10 * * *', new FetchRateMessage(
-                new \DateTimeImmutable(),
-                RateSource::CBR,
-            ))
-        );
+        //        $schedule->add(
+        //            RecurringMessage::cron('0 10 * * *', new FetchRateMessage(
+        //                new \DateTimeImmutable(),
+        //                ProviderEnum::CBR,
+        //            ))
+        //        );
 
         return $schedule;
     }
