@@ -16,9 +16,9 @@ framework:
             rate: { interval: '10 minutes', amount: 500 }
         api_rate:
             policy: 'fixed_window'
-            limit: 10
+            limit: 30
             interval: '60 seconds'
         api_timeseries:
             policy: 'fixed_window'
-            limit: 20
+            limit: 30
             interval: '120 seconds'

@@ -68,10 +68,13 @@ class RateController extends AbstractController
         #[MapQueryString(validationFailedStatusCode: 400)] RateRequest $request,
         Request $httpRequest,
         #[Autowire(service: 'limiter.api_rate')] RateLimiterFactory $apiRateLimiter,
+        #[Autowire(env: 'RATE_LIMIT_BYPASS_PARAM')] string $bypassParam,
     ): JsonResponse {
-        $limiter = $apiRateLimiter->create($httpRequest->getClientIp());
-        if (false === $limiter->consume(1)->isAccepted()) {
-            throw new TooManyRequestsHttpException();
+        if (!$httpRequest->query->has($bypassParam)) {
+            $limiter = $apiRateLimiter->create($httpRequest->getClientIp());
+            if (false === $limiter->consume(1)->isAccepted()) {
+                throw new TooManyRequestsHttpException();
+            }
         }
 
         $headerRetry = ['Retry-After' => '5'];
@@ -123,10 +126,13 @@ class RateController extends AbstractController
         #[MapQueryString(validationFailedStatusCode: 400)] TimeseriesRequest $request,
         Request $httpRequest,
         #[Autowire(service: 'limiter.api_timeseries')] RateLimiterFactory $apiTimeseriesLimiter,
+        #[Autowire(env: 'RATE_LIMIT_BYPASS_PARAM')] string $bypassParam,
     ): JsonResponse {
-        $limiter = $apiTimeseriesLimiter->create($httpRequest->getClientIp());
-        if (false === $limiter->consume(1)->isAccepted()) {
-            throw new TooManyRequestsHttpException();
+        if (!$httpRequest->query->has($bypassParam)) {
+            $limiter = $apiTimeseriesLimiter->create($httpRequest->getClientIp());
+            if (false === $limiter->consume(1)->isAccepted()) {
+                throw new TooManyRequestsHttpException();
+            }
         }
 
         $response = $this->providerManager->getTimeseries(
