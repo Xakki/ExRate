@@ -78,7 +78,7 @@ migrate: ## Run migrations
 	$(composer) test:migrate
 
 load-rates: ## Load rates from 180 last days
-	@make console cmd="app:fetch-history --days=180 --provider=$(provider)" --no-print-directory
+	@make console cmd="app:fetch-history --days=$(days) --provider=$(provider)" --no-print-directory
 
 queue-run: ## manual Run Queue
 	@make console cmd="messenger:consume async -vv" --no-print-directory
@@ -102,11 +102,20 @@ clear-file-var: ## Clear file in var/
 	$(dc) exec php rm -rf /app/var/cache
 	$(dc) exec php rm -rf /app/var/log
 
-db-reset: ## Refresh database and redis
+cache-clear:
+	@make console cmd="cache:pool:clear --all"
+
+db-reset: ## Refresh redis
 	$(dc) exec cache keydb-cli FLUSHALL
-	@make console cmd="doctrine:schema:drop --full-database --force" --no-print-directory
-	@make console cmd="doctrine:schema:drop --full-database --force -e test" --no-print-directory
-	@make migrate --no-print-directory
+	#@make console cmd="doctrine:schema:drop --full-database --force" --no-print-directory
+	#@make console cmd="doctrine:schema:drop --full-database --force -e test" --no-print-directory
+	#@make migrate --no-print-directory
+
+db-dump-restore: ## Restore from dump
+	$(dc) exec database sh -c "mariadb -p${MARIADB_ROOT_PASSWORD} ${MARIADB_DATABASE} < /dump/dump.sql"
+
+db-dump-create: ## Create DB dump
+	$(dc) exec database sh -c "mariadb-dump -p${MARIADB_ROOT_PASSWORD} ${MARIADB_DATABASE} > /dump/dump.sql"
 
 generate-secret: ## get secret for APP_SECRET
 	php -r "print bin2hex(random_bytes(26));"

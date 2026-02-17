@@ -4,28 +4,33 @@ declare(strict_types=1);
 
 namespace App\Provider;
 
-use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
+use App\DTO\RateData;
 use App\Enum\ProviderEnum;
 use App\Exception\DisabledProviderException;
+use App\Exception\FailedProviderException;
+use App\Service\AbstractProviderRate;
 use App\Util\BcMath;
+use App\Util\CryptoCurrencies;
+use App\Util\Currencies;
+use App\Util\Date;
+use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * @see https://docs.apilayer.com/coinlayer/
  */
-final readonly class CoinLayerProvider implements ProviderInterface
+final readonly class CoinLayerProvider extends AbstractProviderRate
 {
-    public const string LATEST_URL = 'http://api.coinlayer.com/api/live';
-    public const string HISTORICAL_URL = 'http://api.coinlayer.com/api/%s';
-
     public function __construct(
-        private HttpClientInterface $httpClient,
-        private string $accessKey,
-        private int $id,
+        protected HttpClientInterface $httpClient,
+        protected LoggerInterface $logger,
+        protected int $id,
+        private string $url,
         private int $currencyPrecision,
+        private string $apiKey,
     ) {
-        if (empty($this->accessKey)) {
+        if (empty($this->apiKey)) {
             throw new DisabledProviderException('Provider disabled: Need API key');
         }
     }
@@ -37,12 +42,7 @@ final readonly class CoinLayerProvider implements ProviderInterface
 
     public function isActive(): bool
     {
-        return !empty($this->accessKey);
-    }
-
-    public function getId(): int
-    {
-        return $this->id;
+        return !empty($this->apiKey);
     }
 
     public function getEnum(): ProviderEnum
@@ -52,7 +52,7 @@ final readonly class CoinLayerProvider implements ProviderInterface
 
     public function getBaseCurrency(): string
     {
-        return 'USD';
+        return Currencies::USD;
     }
 
     public function getHomePage(): string
@@ -65,38 +65,126 @@ final readonly class CoinLayerProvider implements ProviderInterface
         return 'Access real-time and historical crypto data with Coinlayer’s powerful Crypto Currency API. Built for speed, simplicity, and performance—20ms response time, easy integration, and extensive documentation.';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
     {
-        $isToday = $date->format('Y-m-d') === (new \DateTimeImmutable())->format('Y-m-d');
-        $url = $isToday ? self::LATEST_URL : sprintf(self::HISTORICAL_URL, $date->format('Y-m-d'));
+        $isToday = 0 === Date::getDayDiff($date);
+        $baseUrl = rtrim($this->url, '/');
+        $url = $isToday ? $baseUrl.'/live' : sprintf($baseUrl.'/%s', $date->format(Date::FORMAT));
 
-        $response = $this->httpClient->request('GET', $url, [
+        $data = $this->jsonRequest($url, options: [
             'query' => [
-                'access_key' => $this->accessKey,
-                'target' => 'USD',
+                'access_key' => $this->apiKey,
+                'target' => Currencies::USD,
             ],
         ]);
 
-        $content = $response->getContent();
-        $data = json_decode($content, true);
-
-        if (!is_array($data) || !isset($data['success']) || !$data['success']) {
-            throw new \RuntimeException($data['error']['info'] ?? 'Failed to parse Coin Layer response');
+        if (!isset($data['success']) || !$data['success']) {
+            throw new FailedProviderException($data['error']['info'] ?? 'Failed to parse Coin Layer response');
         }
 
         $responseDate = (new \DateTimeImmutable(timezone: new \DateTimeZone('UTC')))->setTimestamp($data['timestamp']);
         $rates = [];
 
         foreach ($data['rates'] as $code => $value) {
-            $rates[$code] = BcMath::round((string) $value, $this->currencyPrecision);
+            $rates[$code] = new RateData(BcMath::round((string) $value, $this->currencyPrecision));
         }
 
-        return new GetRatesResult($this->getId(), $this->getBaseCurrency(), $responseDate, $rates);
+        return new GetRatesResult($this, $this->getBaseCurrency(), $responseDate, $rates);
     }
 
     public function getAvailableCurrencies(): array
     {
-        return ['BTC', 'ETH', 'XRP', 'LTC', 'BCH', 'ADA', 'DOT', 'LINK', 'BNB', 'XLM', 'USDT', 'USDC', 'DOGE', 'UNI', 'EOS', 'TRX', 'NEO', 'IOTA', 'DASH', 'ETC', 'VEN', 'XEM', 'OKB', 'ATOM', 'XMR', 'CRO', 'ALGO', 'XTZ', 'AVAX', 'SOL', 'MATIC', 'SHIB', 'LUNA', 'HEX', 'FIL', 'VET', 'ICP', 'THETA', 'DAI', 'FTT', 'AXS', 'EGLD', 'MANA', 'NEAR', 'SAND', 'AAVE', 'CAKE', 'GRT', 'KLAY', 'HBAR', 'BSV', 'MIOTA', 'MKR', 'STX', 'FLOW', 'QNT', 'RUNE', 'ZEC', 'HNT', 'TFUEL', 'ONE', 'ENJ', 'HOT', 'SUSHI', 'CELO', 'CHZ', 'COMP', 'SNX', 'YFI', 'ZIL', 'QTUM', 'BAT', 'BTG', 'DCR', 'RVN', 'WAVES', 'ICX', 'ONT', 'ZRX', 'OMG', 'ANKR', 'ZEN', 'IOST', 'SC', 'DGB', 'XVG', 'BTT', 'NANO', 'LSK'];
+        return [
+            CryptoCurrencies::BTC,
+            CryptoCurrencies::ETH,
+            CryptoCurrencies::XRP,
+            CryptoCurrencies::LTC,
+            CryptoCurrencies::BCH,
+            CryptoCurrencies::ADA,
+            CryptoCurrencies::DOT,
+            CryptoCurrencies::LINK,
+            CryptoCurrencies::BNB,
+            CryptoCurrencies::XLM,
+            CryptoCurrencies::USDT,
+            CryptoCurrencies::USDC,
+            CryptoCurrencies::DOGE,
+            CryptoCurrencies::UNI,
+            CryptoCurrencies::EOS,
+            CryptoCurrencies::TRX,
+            CryptoCurrencies::NEO,
+            CryptoCurrencies::IOTA,
+            CryptoCurrencies::DASH,
+            CryptoCurrencies::ETC,
+            CryptoCurrencies::VEN,
+            CryptoCurrencies::XEM,
+            CryptoCurrencies::OKB,
+            CryptoCurrencies::ATOM,
+            CryptoCurrencies::XMR,
+            CryptoCurrencies::CRO,
+            CryptoCurrencies::ALGO,
+            CryptoCurrencies::XTZ,
+            CryptoCurrencies::AVAX,
+            CryptoCurrencies::SOL,
+            CryptoCurrencies::MATIC,
+            CryptoCurrencies::SHIB,
+            CryptoCurrencies::LUNA,
+            CryptoCurrencies::HEX,
+            CryptoCurrencies::FIL,
+            CryptoCurrencies::VET,
+            CryptoCurrencies::ICP,
+            CryptoCurrencies::THETA,
+            CryptoCurrencies::DAI,
+            CryptoCurrencies::FTT,
+            CryptoCurrencies::AXS,
+            CryptoCurrencies::EGLD,
+            CryptoCurrencies::MANA,
+            CryptoCurrencies::NEAR,
+            CryptoCurrencies::SAND,
+            CryptoCurrencies::AAVE,
+            CryptoCurrencies::CAKE,
+            CryptoCurrencies::GRT,
+            CryptoCurrencies::KLAY,
+            CryptoCurrencies::HBAR,
+            CryptoCurrencies::BSV,
+            CryptoCurrencies::MIOTA,
+            CryptoCurrencies::MKR,
+            CryptoCurrencies::STX,
+            CryptoCurrencies::FLOW,
+            CryptoCurrencies::QNT,
+            CryptoCurrencies::RUNE,
+            CryptoCurrencies::ZEC,
+            CryptoCurrencies::HNT,
+            CryptoCurrencies::TFUEL,
+            CryptoCurrencies::ONE,
+            CryptoCurrencies::ENJ,
+            CryptoCurrencies::HOT,
+            CryptoCurrencies::SUSHI,
+            CryptoCurrencies::CELO,
+            CryptoCurrencies::CHZ,
+            CryptoCurrencies::COMP,
+            CryptoCurrencies::SNX,
+            CryptoCurrencies::YFI,
+            CryptoCurrencies::ZIL,
+            CryptoCurrencies::QTUM,
+            CryptoCurrencies::BAT,
+            CryptoCurrencies::BTG,
+            CryptoCurrencies::DCR,
+            CryptoCurrencies::RVN,
+            CryptoCurrencies::WAVES,
+            CryptoCurrencies::ICX,
+            CryptoCurrencies::ONT,
+            CryptoCurrencies::ZRX,
+            CryptoCurrencies::OMG,
+            CryptoCurrencies::ANKR,
+            CryptoCurrencies::ZEN,
+            CryptoCurrencies::IOST,
+            CryptoCurrencies::SC,
+            CryptoCurrencies::DGB,
+            CryptoCurrencies::XVG,
+            CryptoCurrencies::BTT,
+            CryptoCurrencies::NANO,
+            CryptoCurrencies::LSK,
+        ];
     }
 
     public function getRequestLimit(): int
@@ -109,8 +197,11 @@ final readonly class CoinLayerProvider implements ProviderInterface
         return 86400;
     }
 
-    public function getRequestDelay(): int
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
     {
-        return 2;
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

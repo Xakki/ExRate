@@ -18,7 +18,7 @@ final class BcMath
         /** @var numeric-string $result */
         $result = \bcdiv($left, $right, $scale);
 
-        return $result;
+        return self::trimTrailingZeros($result);
     }
 
     /**
@@ -30,7 +30,7 @@ final class BcMath
         $right = self::normalize($right);
         self::assertNumeric($left, $right);
 
-        return \bcsub($left, $right, $scale);
+        return self::trimTrailingZeros(\bcsub($left, $right, $scale));
     }
 
     public static function comp(string|int|float $left, string|int|float $right, int $scale): int
@@ -51,11 +51,11 @@ final class BcMath
         }
 
         if (function_exists('bcround')) {
-            return \bcround($value, $scale);
+            return self::trimTrailingZeros(\bcround($value, $scale));
         }
 
         if (false === strpos($value, '.')) {
-            return \bcadd($value, '0', $scale);
+            return self::trimTrailingZeros(\bcadd($value, '0', $scale));
         }
 
         $isNegative = -1 === \bccomp($value, '0', $scale + 1);
@@ -63,14 +63,14 @@ final class BcMath
 
         if ($isNegative) {
             // @phpstan-ignore argument.type
-            return \bcsub($value, $add, $scale);
+            return self::trimTrailingZeros(\bcsub($value, $add, $scale));
         }
 
         // @phpstan-ignore argument.type
-        return \bcadd($value, $add, $scale);
+        return self::trimTrailingZeros(\bcadd($value, $add, $scale));
     }
 
-    private static function normalize(string|int|float $value): string
+    public static function normalize(string|int|float $value): string
     {
         $value = str_replace(',', '.', (string) $value);
 
@@ -105,7 +105,7 @@ final class BcMath
             $value = ($isNegative ? '-' : '').$res;
         }
 
-        return $value;
+        return self::trimTrailingZeros($value);
     }
 
     /**
@@ -117,5 +117,19 @@ final class BcMath
         if (!is_numeric($left) || !is_numeric($right)) {
             throw new \LogicException(sprintf('Expected numeric strings, got: %s and %s', $left, $right));
         }
+    }
+
+    /**
+     * @return numeric-string
+     */
+    private static function trimTrailingZeros(string $value): string
+    {
+        if (str_contains($value, '.')) {
+            $value = rtrim($value, '0');
+            $value = rtrim($value, '.');
+        }
+
+        // @phpstan-ignore return.type
+        return $value;
     }
 }

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Contract\Cache;
 
-use App\DTO\RateResponse;
 use App\Enum\ProviderEnum;
+use App\Response\RateResponse;
 
 interface RateCacheInterface
 {

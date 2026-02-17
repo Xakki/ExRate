@@ -4,23 +4,26 @@ declare(strict_types=1);
 
 namespace App\Provider;
 
-use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
+use App\DTO\RateData;
 use App\Enum\ProviderEnum;
+use App\Service\AbstractProviderRate;
 use App\Util\BcMath;
+use App\Util\Currencies;
+use App\Util\Date;
+use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * @see https://www.bnr.ro/Exchange-rates-1224.aspx
  */
-final readonly class NbrProvider implements ProviderInterface
+final readonly class NbrProvider extends AbstractProviderRate
 {
-    public const string URL = 'https://curs.bnr.ro/nbrfxrates.xml';
-    public const string HISTORICAL_URL_TEMPLATE = 'https://curs.bnr.ro/files/xml/years/nbrfxrates{year}.xml';
-
     public function __construct(
-        private HttpClientInterface $httpClient,
-        private int $id,
+        protected HttpClientInterface $httpClient,
+        protected LoggerInterface $logger,
+        protected int $id,
+        private string $url,
         private int $currencyPrecision,
     ) {
     }
@@ -30,11 +33,6 @@ final readonly class NbrProvider implements ProviderInterface
         return 'provider.nbr';
     }
 
-    public function getId(): int
-    {
-        return $this->id;
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::NBR;
@@ -42,7 +40,7 @@ final readonly class NbrProvider implements ProviderInterface
 
     public function getBaseCurrency(): string
     {
-        return 'RON';
+        return Currencies::RON;
     }
 
     public function getHomePage(): string
@@ -55,97 +53,68 @@ final readonly class NbrProvider implements ProviderInterface
         return 'National Bank of Romania';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    #[\Deprecated]
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
     {
-        $year = $date->format('Y');
-        $isToday = $date->format('Y-m-d') === (new \DateTimeImmutable())->format('Y-m-d');
-
-        $url = $isToday ? self::URL : str_replace('{year}', $year, self::HISTORICAL_URL_TEMPLATE);
-
-        $response = $this->httpClient->request('GET', $url);
-        $content = $response->getContent();
-
-        $xml = simplexml_load_string($content);
-
-        if (false === $xml) {
-            throw new \RuntimeException('Failed to parse NBR XML response');
-        }
-
-        $xml->registerXPathNamespace('ns', 'http://www.bnr.ro/xsd');
-
-        $targetDateStr = $date->format('Y-m-d');
-        // NBR historical XML contains multiple cubes for each date
-        $cube = $xml->xpath("//ns:Cube[@date='{$targetDateStr}']");
-
-        if (!$cube) {
-            // Try to find the latest available date <= requested date
-            $cubes = $xml->xpath('//ns:Cube[@date]');
-            $bestCube = null;
-            $bestDateStr = null;
-
-            if (is_array($cubes)) {
-                foreach ($cubes as $c) {
-                    $cDateStr = (string) $c['date'];
-                    if ($cDateStr <= $targetDateStr) {
-                        if (null === $bestDateStr || $cDateStr > $bestDateStr) {
-                            $bestDateStr = $cDateStr;
-                            $bestCube = $c;
-                        }
-                    }
-                }
-            }
-
-            if (!$bestCube && $isToday) {
-                // For latest, it might not have the date attribute in a Cube tag if it's the main URL
-                $cube = $xml->xpath('//ns:Cube');
-            } elseif ($bestCube) {
-                $cube = [$bestCube];
-            } else {
-                throw new \RuntimeException(sprintf('No NBR rates found for date %s', $targetDateStr));
-            }
-        }
-
-        if (!$cube || !isset($cube[0])) {
-            throw new \RuntimeException(sprintf('No NBR rates found for date %s', $targetDateStr));
-        }
-
-        $responseDateStr = (string) ($cube[0]['date'] ?? $xml->xpath('//ns:PublishingDate')[0] ?? $targetDateStr);
-        $responseDate = new \DateTimeImmutable($responseDateStr);
-
-        $rates = [];
-        foreach ($cube[0]->Rate as $rateNode) {
-            $code = (string) $rateNode['currency'];
-            $value = (string) $rateNode;
-            $multiplier = isset($rateNode['multiplier']) ? (string) $rateNode['multiplier'] : '1';
-
-            $rates[$code] = BcMath::div($value, $multiplier, $this->currencyPrecision);
-        }
-
-        return new GetRatesResult($this->getId(), $this->getBaseCurrency(), $responseDate, $rates);
-    }
-
-    public function isActive(): bool
-    {
-        return true;
+        throw new \App\Exception\NotAvailableMethod();
     }
 
     public function getAvailableCurrencies(): array
     {
-        return ['AED', 'AUD', 'BRL', 'CAD', 'CHF', 'CNY', 'CZK', 'DKK', 'EGP', 'EUR', 'GBP', 'HKD', 'HUF', 'IDR', 'ILS', 'INR', 'ISK', 'JPY', 'KRW', 'MDL', 'MXN', 'MYR', 'NOK', 'NZD', 'PHP', 'PLN', 'RSD', 'RUB', 'SEK', 'SGD', 'THB', 'TRY', 'UAH', 'USD', 'XAU', 'XDR', 'ZAR'];
+        return [Currencies::AED, Currencies::AUD, Currencies::BRL, Currencies::CAD, Currencies::CHF, Currencies::CNY, Currencies::CZK, Currencies::DKK, Currencies::EGP, Currencies::EUR, Currencies::GBP, Currencies::HKD, Currencies::HUF, Currencies::IDR, Currencies::ILS, Currencies::INR, Currencies::ISK, Currencies::JPY, Currencies::KRW, Currencies::MDL, Currencies::MXN, Currencies::MYR, Currencies::NOK, Currencies::NZD, Currencies::PHP, Currencies::PLN, Currencies::RSD, Currencies::RUB, Currencies::SEK, Currencies::SGD, Currencies::THB, Currencies::TRY, Currencies::UAH, Currencies::USD, Currencies::XAU, Currencies::XDR, Currencies::ZAR];
     }
 
-    public function getRequestLimit(): int
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
     {
-        return 0;
-    }
+        $years = [];
+        $currentYear = (int) $start->format('Y');
+        $endYear = (int) $end->format('Y');
+        for ($y = $currentYear; $y <= $endYear; ++$y) {
+            $years[] = $y;
+        }
 
-    public function getRequestLimitPeriod(): int
-    {
-        return 0;
-    }
+        $isToday = 0 === Date::getDayDiff($end);
+        $baseUrl = rtrim($this->url, '/');
+        $start = $start->setTime(0, 0);
+        $end = $end->setTime(23, 59, 59);
 
-    public function getRequestDelay(): int
-    {
-        return 2;
+        $results = [];
+        foreach ($years as $year) {
+            $url = ($isToday && $year === (int) date('Y')) ? $baseUrl.'/nbrfxrates.xml' : $baseUrl."/files/xml/years/nbrfxrates{$year}.xml";
+            try {
+                $xml = $this->xmlRequest($url);
+            } catch (\Throwable) {
+                continue;
+            }
+
+            $xml->registerXPathNamespace('ns', 'http://www.bnr.ro/xsd');
+            $cubes = $xml->xpath('//ns:Cube[@date]');
+
+            if (is_array($cubes)) {
+                foreach ($cubes as $cube) {
+                    $cDateStr = (string) $cube['date'];
+                    $cDate = new \DateTimeImmutable($cDateStr);
+
+                    if (Date::getDayDiff($cDate, $start) <= 0 && Date::getDayDiff($cDate, $end) >= 0) {
+                        $rates = [];
+                        foreach ($cube->Rate as $rateNode) {
+                            $code = (string) $rateNode['currency'];
+                            $value = (string) $rateNode;
+                            $multiplier = isset($rateNode['multiplier']) ? (string) $rateNode['multiplier'] : '1';
+
+                            $rates[$code] = new RateData(BcMath::div($value, $multiplier, $this->currencyPrecision));
+                        }
+                        $results[$cDateStr] = new GetRatesResult($this, $this->getBaseCurrency(), $cDate, $rates);
+                    }
+                }
+            }
+        }
+
+        ksort($results);
+
+        return array_values($results);
     }
 }

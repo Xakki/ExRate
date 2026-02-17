@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Command;
 
 use App\Contract\Cache\RateLimitCacheInterface;
-use App\Contract\ProviderInterface;
 use App\Enum\ProviderEnum;
 use App\Exception\DisabledProviderException;
 use App\Message\FetchRateMessage;
@@ -45,7 +44,7 @@ class FetchHistoricalRatesCommand extends Command
         $days = (int) $input->getOption('days');
         $provider = $input->getOption('provider');
 
-        $output->writeln("Dispatching jobs to fetch rates for the last $days days for ".($provider ?: 'All'));
+        // $output->writeln("Dispatching jobs to fetch rates for the last $days days for ".($provider ?: 'All'));
 
         if ($provider) {
             $providersEnum[] = ProviderEnum::from($provider);
@@ -53,24 +52,18 @@ class FetchHistoricalRatesCommand extends Command
             $providersEnum = ProviderEnum::cases();
         }
 
-        /** @var ProviderInterface[] $allowProviders */
-        $allowProviders = [];
+        $lastDay = new \DateTimeImmutable()->modify('-1 day');
         foreach ($providersEnum as $providerEnum) {
             try {
-                $allowProviders[] = $this->providerRegistry->get($providerEnum);
+                $provider = $this->providerRegistry->get($providerEnum);
+                $message = new FetchRateMessage($lastDay, $provider->getEnum(), $days);
+                $this->bus->dispatch($message, $message->getStamps(cache: $this->rateLimitCache, provider: $provider));
             } catch (DisabledProviderException) {
                 // Skipp
             }
         }
 
-        $today = new \DateTimeImmutable();
-
-        foreach ($allowProviders as $provider) {
-            $message = new FetchRateMessage($today, $provider->getEnum(), $days);
-            $this->bus->dispatch($message, $message->getStamps(cache: $this->rateLimitCache, provider: $provider));
-        }
-
-        $output->writeln('Jobs dispatched successfully.');
+        // $output->writeln('Jobs dispatched successfully.');
 
         return Command::SUCCESS;
     }

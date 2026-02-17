@@ -4,36 +4,34 @@ declare(strict_types=1);
 
 namespace App\Provider;
 
-use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
+use App\DTO\RateData;
 use App\Enum\ProviderEnum;
+use App\Exception\FailedProviderException;
+use App\Service\AbstractProviderRate;
 use App\Util\BcMath;
+use App\Util\Currencies;
+use App\Util\Date;
+use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * @see https://www.bnb.bg
- *
- * @todo URL returns HTML instead of XML. Needs update or fix.
  */
-final readonly class BnbProvider implements ProviderInterface
+final readonly class BnbProvider extends AbstractProviderRate
 {
-    public const string URL = 'https://www.bnb.bg/Statistics/StExternalSector/StExchangeRates/StERForeignCurrencies/index.htm?lang=EN&downloadOper=true&group1=first&firstDays=%s&firstMonths=%s&firstYear=%s&search=true&showChart=false&showChartButton=false&type=XML';
-
     public function __construct(
-        private HttpClientInterface $httpClient,
-        private int $id,
-        private int $currencyPrecision,
+        protected HttpClientInterface $httpClient,
+        protected LoggerInterface $logger,
+        protected int $id,
+        private string $url,
+        private int $currencyPrecision = 8,
     ) {
     }
 
     public static function getServiceName(): string
     {
         return 'provider.bnb';
-    }
-
-    public function getId(): int
-    {
-        return $this->id;
     }
 
     public function getEnum(): ProviderEnum
@@ -43,7 +41,7 @@ final readonly class BnbProvider implements ProviderInterface
 
     public function getBaseCurrency(): string
     {
-        return 'BGN';
+        return Currencies::EUR;
     }
 
     public function getHomePage(): string
@@ -56,71 +54,69 @@ final readonly class BnbProvider implements ProviderInterface
         return 'Bulgarian National Bank';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
     {
         $day = $date->format('d');
         $month = $date->format('m');
         $year = $date->format('Y');
 
-        $url = sprintf(self::URL, $day, $month, $year);
+        $url = $this->url.sprintf('?lang=EN&downloadOper=true&group1=first&firstDays=%s&firstMonths=%s&firstYear=%s&search=true&showChart=false&showChartButton=false&type=XML', $day, $month, $year);
 
-        $response = $this->httpClient->request('GET', $url);
-        $content = $response->getContent();
-
-        if ('<ROWSET>' !== mb_substr($content, 0, 8)) {
-            return new GetRatesResult($this->getId(), $this->getBaseCurrency(), $date, []);
-        }
-        $xml = simplexml_load_string($content);
-
-        if (false === $xml) {
-            throw new \RuntimeException('Failed to parse BNB XML response');
+        try {
+            $xml = $this->xmlRequest($url);
+        } catch (FailedProviderException) {
+            return new GetRatesResult($this, $this->getBaseCurrency(), $date, []);
         }
 
         $rates = [];
-        $responseDate = $date;
+        $responseDate = null;
 
-        foreach ($xml->ROW as $row) {
-            $code = (string) $row->CODE;
-            if (!$code) {
+        foreach ($xml as $row) {
+            if (isset($row->TITLE)) {
                 continue;
             }
+            $code = (string) $row->CODE;
             $rate = (string) $row->RATE;
-            $ratio = (string) $row->RATIO;
 
-            if ($rate && $ratio) {
-                $rates[$code] = BcMath::div($rate, $ratio, $this->currencyPrecision);
+            if ($rate && is_numeric($rate)) {
+                $rates[$code] = new RateData(BcMath::div(1, $rate, $this->currencyPrecision));
             }
 
-            if (isset($row->CURR_DATE)) {
-                $responseDate = \DateTimeImmutable::createFromFormat('d.m.Y', (string) $row->CURR_DATE) ?: $responseDate;
+            if (!$responseDate) {
+                try {
+                    $responseDate = Date::createFromFormat('d.m.Y', (string) $row->CURR_DATE);
+                } catch (\App\Exception\BadDateException) {
+                    // TODO: log notice
+                    $responseDate = $date;
+                }
             }
         }
 
-        return new GetRatesResult($this->getId(), $this->getBaseCurrency(), $responseDate, $rates);
-    }
-
-    public function isActive(): bool
-    {
-        return false;
+        return new GetRatesResult($this, $this->getBaseCurrency(), $responseDate, $rates);
     }
 
     public function getAvailableCurrencies(): array
     {
-        return ['AUD', 'BRL', 'CAD', 'CHF', 'CNY', 'CZK', 'DKK', 'GBP', 'HKD', 'HUF', 'IDR', 'ILS', 'INR', 'ISK', 'JPY', 'KRW', 'MXN', 'MYR', 'NOK', 'NZD', 'PHP', 'PLN', 'RON', 'SEK', 'SGD', 'THB', 'TRY', 'USD', 'ZAR'];
+        return [Currencies::XAU, Currencies::LVL, Currencies::LTL, Currencies::CYP, Currencies::EEK, Currencies::MTL, Currencies::ROL, Currencies::SIT, Currencies::SKK, Currencies::TRL, Currencies::AUD, Currencies::BRL, Currencies::CAD, Currencies::CHF, Currencies::CNY, Currencies::CZK, Currencies::DKK, Currencies::GBP, Currencies::HKD, Currencies::HUF, Currencies::IDR, Currencies::ILS, Currencies::INR, Currencies::ISK, Currencies::JPY, Currencies::KRW, Currencies::MXN, Currencies::MYR, Currencies::NOK, Currencies::NZD, Currencies::PHP, Currencies::PLN, Currencies::RON, Currencies::SEK, Currencies::SGD, Currencies::THB, Currencies::TRY, Currencies::USD, Currencies::ZAR];
     }
 
-    public function getRequestLimit(): int
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
     {
-        return 0;
+        throw new \App\Exception\NotAvailableMethod();
     }
 
-    public function getRequestLimitPeriod(): int
+    /**
+     * @return array<string, string>
+     */
+    protected function getDnsResolveOptions(int $attempt = 0): array
     {
-        return 0;
-    }
+        if (1 == $attempt) {
+            return ['www.bnb.bg' => '91.209.146.25'];
+        }
 
-    public function getRequestDelay(): int
-    {
-        return 2;
+        return parent::getDnsResolveOptions($attempt);
     }
 }

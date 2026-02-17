@@ -4,22 +4,29 @@ declare(strict_types=1);
 
 namespace App\Provider;
 
-use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
+use App\DTO\RateData;
 use App\Enum\ProviderEnum;
+use App\Exception\FailedProviderException;
+use App\Service\AbstractProviderRate;
 use App\Util\BcMath;
+use App\Util\Currencies;
+use App\Util\UrlTemplateTrait;
+use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * @see https://nbg.gov.ge/en/monetary-policy/currency
  */
-final readonly class NbgProvider implements ProviderInterface
+final readonly class NbgProvider extends AbstractProviderRate
 {
-    public const string BASE_URL = 'https://nbg.gov.ge/gw/api/ct/monetarypolicy/currencies/en/json';
+    use UrlTemplateTrait;
 
     public function __construct(
-        private HttpClientInterface $httpClient,
-        private int $id,
+        protected HttpClientInterface $httpClient,
+        protected LoggerInterface $logger,
+        protected int $id,
+        private string $url,
         private int $currencyPrecision,
     ) {
     }
@@ -29,11 +36,6 @@ final readonly class NbgProvider implements ProviderInterface
         return 'provider.nbg';
     }
 
-    public function getId(): int
-    {
-        return $this->id;
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::NBG;
@@ -41,7 +43,7 @@ final readonly class NbgProvider implements ProviderInterface
 
     public function getBaseCurrency(): string
     {
-        return 'GEL';
+        return Currencies::GEL;
     }
 
     public function getHomePage(): string
@@ -54,16 +56,14 @@ final readonly class NbgProvider implements ProviderInterface
         return 'National Bank of Georgia';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
     {
-        $url = self::BASE_URL.'?date='.$date->format('Y-m-d');
+        $url = $this->prepareUrl($this->url, $date, $this->getBaseCurrency());
 
-        $response = $this->httpClient->request('GET', $url);
-        $content = $response->getContent();
-        $data = json_decode($content, true);
+        $data = $this->jsonRequest($url);
 
-        if (!is_array($data) || !isset($data[0])) {
-            throw new \RuntimeException('Failed to parse NBG JSON response');
+        if (!isset($data[0])) {
+            throw new FailedProviderException('Failed to parse NBG JSON response');
         }
 
         $element = $data[0];
@@ -75,34 +75,22 @@ final readonly class NbgProvider implements ProviderInterface
             $rateStr = (string) $currency['rate'];
             $quantity = (string) $currency['quantity'];
 
-            $rates[$code] = BcMath::div($rateStr, $quantity, $this->currencyPrecision);
+            $rates[$code] = new RateData(BcMath::div($rateStr, $quantity, $this->currencyPrecision));
         }
 
-        return new GetRatesResult($this->getId(), $this->getBaseCurrency(), $responseDate, $rates);
-    }
-
-    public function isActive(): bool
-    {
-        return true;
+        return new GetRatesResult($this, $this->getBaseCurrency(), $responseDate, $rates);
     }
 
     public function getAvailableCurrencies(): array
     {
-        return ['AED', 'AMD', 'AUD', 'AZN', 'BRL', 'BYN', 'CAD', 'CHF', 'CNY', 'CZK', 'DKK', 'EGP', 'EUR', 'GBP', 'HKD', 'HUF', 'ILS', 'INR', 'IRR', 'ISK', 'JPY', 'KGS', 'KRW', 'KWD', 'KZT', 'MDL', 'NOK', 'NZD', 'PLN', 'QAR', 'RON', 'RSD', 'RUB', 'SEK', 'SGD', 'TJS', 'TMT', 'TRY', 'UAH', 'USD', 'UZS', 'ZAR'];
+        return [Currencies::AED, Currencies::AMD, Currencies::AUD, Currencies::AZN, Currencies::BRL, Currencies::BYN, Currencies::CAD, Currencies::CHF, Currencies::CNY, Currencies::CZK, Currencies::DKK, Currencies::EGP, Currencies::EUR, Currencies::GBP, Currencies::HKD, Currencies::HUF, Currencies::ILS, Currencies::INR, Currencies::IRR, Currencies::ISK, Currencies::JPY, Currencies::KGS, Currencies::KRW, Currencies::KWD, Currencies::KZT, Currencies::MDL, Currencies::NOK, Currencies::NZD, Currencies::PLN, Currencies::QAR, Currencies::RON, Currencies::RSD, Currencies::RUB, Currencies::SEK, Currencies::SGD, Currencies::TJS, Currencies::TMT, Currencies::TRY, Currencies::UAH, Currencies::USD, Currencies::UZS, Currencies::ZAR];
     }
 
-    public function getRequestLimit(): int
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
     {
-        return 0;
-    }
-
-    public function getRequestLimitPeriod(): int
-    {
-        return 0;
-    }
-
-    public function getRequestDelay(): int
-    {
-        return 2;
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

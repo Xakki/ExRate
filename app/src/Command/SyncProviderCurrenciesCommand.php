@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Command;
 
-use App\Contract\ProviderInterface;
+use App\Contract\ProviderRateInterface;
 use App\Exception\DisabledProviderException;
 use App\Service\ProviderRegistry;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -46,7 +46,7 @@ class SyncProviderCurrenciesCommand extends Command
             $io->section(sprintf('Checking %s...', $providerEnum->value));
 
             try {
-                $ratesResult = $provider->getRates(new \DateTimeImmutable());
+                $ratesResult = $provider->getRatesByDate(new \DateTimeImmutable());
                 if (!count($ratesResult->rates)) {
                     $io->warning(sprintf('Provider %s return empty rates (Weekend?), skipping.', $providerEnum->value));
                     continue;
@@ -88,7 +88,7 @@ class SyncProviderCurrenciesCommand extends Command
     /**
      * @param string[] $currencies
      */
-    private function updateProviderFile(ProviderInterface $provider, array $currencies): bool
+    private function updateProviderFile(ProviderRateInterface $provider, array $currencies): bool
     {
         $reflection = new \ReflectionClass($provider);
         $fileName = $reflection->getFileName();

@@ -4,21 +4,31 @@ declare(strict_types=1);
 
 namespace App\Provider;
 
-use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
+use App\DTO\RateData;
 use App\Enum\ProviderEnum;
+use App\Service\AbstractProviderRate;
 use App\Util\BcMath;
+use App\Util\Currencies;
+use App\Util\Date;
+use App\Util\UrlTemplateTrait;
+use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+
+use function PHPUnit\Framework\assertNotEmpty;
 
 /**
  * @see https://cbr.ru/development/SXML/
  */
-final readonly class CbrProvider implements ProviderInterface
+final readonly class CbrProvider extends AbstractProviderRate
 {
+    use UrlTemplateTrait;
+
     public function __construct(
-        private HttpClientInterface $httpClient,
+        protected HttpClientInterface $httpClient,
+        protected LoggerInterface $logger,
+        protected int $id,
         private string $url,
-        private int $id,
         private int $currencyPrecision,
     ) {
     }
@@ -28,11 +38,6 @@ final readonly class CbrProvider implements ProviderInterface
         return 'provider.cbr';
     }
 
-    public function getId(): int
-    {
-        return $this->id;
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::CBR;
@@ -40,7 +45,7 @@ final readonly class CbrProvider implements ProviderInterface
 
     public function getBaseCurrency(): string
     {
-        return 'RUB';
+        return Currencies::RUB;
     }
 
     public function getHomePage(): string
@@ -53,67 +58,44 @@ final readonly class CbrProvider implements ProviderInterface
         return 'Central Bank of the Russian Federation';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getAvailableCurrencies(): array
     {
-        // CBR expects date in format dd/mm/yyyy
-        $dateStr = $date->format('d/m/Y');
+        return [Currencies::AED, Currencies::AMD, Currencies::AUD, Currencies::AZN, Currencies::BDT, Currencies::BHD, Currencies::BOB, Currencies::BRL, Currencies::BYN, Currencies::CAD, Currencies::CHF, Currencies::CNY, Currencies::CUP, Currencies::CZK, Currencies::DKK, Currencies::DZD, Currencies::EGP, Currencies::ETB, Currencies::EUR, Currencies::GBP, Currencies::GEL, Currencies::HKD, Currencies::HUF, Currencies::IDR, Currencies::INR, Currencies::IRR, Currencies::JPY, Currencies::KGS, Currencies::KRW, Currencies::KZT, Currencies::MDL, Currencies::MMK, Currencies::MNT, Currencies::NGN, Currencies::NOK, Currencies::NZD, Currencies::OMR, Currencies::PLN, Currencies::QAR, Currencies::RON, Currencies::RSD, Currencies::SAR, Currencies::SEK, Currencies::SGD, Currencies::THB, Currencies::TJS, Currencies::TMT, Currencies::TRY, Currencies::UAH, Currencies::USD, Currencies::UZS, Currencies::VND, Currencies::XDR, Currencies::ZAR];
+    }
 
-        $response = $this->httpClient->request('GET', $this->url, [
-            'query' => [
-                'date_req' => $dateStr,
-            ],
-            'timeout' => 5.0,
-        ]);
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
+    {
+        $url = $this->prepareUrl($this->url, $date, $this->getBaseCurrency());
 
-        $content = $response->getContent();
-
-        $xml = simplexml_load_string($content);
-
-        if (false === $xml) {
-            throw new \RuntimeException('Failed to parse CBR XML response');
-        }
+        $xml = $this->xmlRequest($url);
 
         $rates = [];
         if (isset($xml->Valute)) {
             foreach ($xml->Valute as $valute) {
+                assertNotEmpty($valute->CharCode);
+                assertNotEmpty($valute->VunitRate);
                 $code = (string) $valute->CharCode;
-                $value = (string) $valute->Value;
-                $nominal = (string) $valute->Nominal;
+                $value = (string) $valute->VunitRate;
 
-                $rates[$code] = BcMath::div($value, $nominal, $this->currencyPrecision);
+                $rates[$code] = new RateData(BcMath::round($value, $this->currencyPrecision));
             }
         }
 
-        $responseDate = \DateTimeImmutable::createFromFormat('d.m.Y', (string) $xml['Date']);
-        if (false === $responseDate) {
+        try {
+            $responseDate = Date::createFromFormat('d.m.Y', (string) $xml['Date']);
+        } catch (\App\Exception\BadDateException) {
+            // TODO: log notice
             $responseDate = $date;
         }
 
-        return new GetRatesResult($this->getId(), $this->getBaseCurrency(), $responseDate, $rates);
+        return new GetRatesResult($this, $this->getBaseCurrency(), $responseDate, $rates);
     }
 
-    public function isActive(): bool
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
     {
-        return true;
-    }
-
-    public function getAvailableCurrencies(): array
-    {
-        return ['AED', 'AMD', 'AUD', 'AZN', 'BDT', 'BHD', 'BOB', 'BRL', 'BYN', 'CAD', 'CHF', 'CNY', 'CUP', 'CZK', 'DKK', 'DZD', 'EGP', 'ETB', 'EUR', 'GBP', 'GEL', 'HKD', 'HUF', 'IDR', 'INR', 'IRR', 'JPY', 'KGS', 'KRW', 'KZT', 'MDL', 'MMK', 'MNT', 'NGN', 'NOK', 'NZD', 'OMR', 'PLN', 'QAR', 'RON', 'RSD', 'SAR', 'SEK', 'SGD', 'THB', 'TJS', 'TMT', 'TRY', 'UAH', 'USD', 'UZS', 'VND', 'XDR', 'ZAR'];
-    }
-
-    public function getRequestLimit(): int
-    {
-        return 0;
-    }
-
-    public function getRequestLimitPeriod(): int
-    {
-        return 0;
-    }
-
-    public function getRequestDelay(): int
-    {
-        return 2;
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

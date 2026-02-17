@@ -12,6 +12,7 @@
         "ext-bcmath": "*",
         "ext-ctype": "*",
         "ext-iconv": "*",
+        "ext-intl": "*",
         "ext-pcntl": "*",
         "ext-redis": "*",
         "ext-simplexml": "*",

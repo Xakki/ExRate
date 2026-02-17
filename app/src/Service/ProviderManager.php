@@ -5,32 +5,37 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Contract\Cache\RateCacheInterface;
-use App\Contract\Cache\SkipDayCacheInterface;
 use App\Contract\Cache\TimeseriesCacheInterface;
-use App\Contract\ProviderInterface;
-use App\DTO\RateResponse;
-use App\DTO\TimeseriesResponse;
-use App\Entity\ExchangeRate;
+use App\Contract\ProviderRateInterface;
+use App\Contract\RateRepositoryInterface;
+use App\Enum\FrequencyEnum;
 use App\Enum\ProviderEnum;
 use App\Exception\RateNotFoundException;
-use App\Repository\ExchangeRateRepository;
+use App\Response\RateResponse;
+use App\Response\TimeseriesResponse;
 use App\Util\BcMath;
+use App\Util\Date;
 
 readonly class ProviderManager
 {
     public function __construct(
         private ProviderRegistry $providerRegistry,
-        private ExchangeRateRepository $repository,
+        private RateRepositoryInterface $repository,
         private RateCacheInterface $rateCache,
-        private SkipDayCacheInterface $correctedDayCache,
         private TimeseriesCacheInterface $timeseriesCache,
         private int $currencyPrecision,
     ) {
     }
 
-    public function getTimeseries(\DateTimeImmutable $start, \DateTimeImmutable $end, string $currency, string $baseCurrency, ProviderEnum $providerEnum = ProviderEnum::CBR): TimeseriesResponse
-    {
-        if ($cached = $this->timeseriesCache->get($start, $end, $providerEnum, $baseCurrency, $currency)) {
+    public function getTimeseries(
+        \DateTimeImmutable $start,
+        \DateTimeImmutable $end,
+        string $currency,
+        string $baseCurrency,
+        ProviderEnum $providerEnum = ProviderEnum::ECB,
+        FrequencyEnum $group = FrequencyEnum::Daily,
+    ): TimeseriesResponse {
+        if ($cached = $this->timeseriesCache->get($start, $end, $providerEnum, $baseCurrency, $currency, $group)) {
             return $cached;
         }
 
@@ -38,10 +43,12 @@ readonly class ProviderManager
         $providerBaseCurrency = $provider->getBaseCurrency();
 
         $rates = [];
-        if ($providerBaseCurrency !== $baseCurrency) {
+        if ($providerBaseCurrency === $currency) {
+            $rates = $this->getRatesMap($provider, $baseCurrency, $currency, $start, $end, true);
+        } elseif ($providerBaseCurrency !== $baseCurrency) {
             // Cross rate logic
-            $targetRates = $this->getRatesMap($provider->getId(), $currency, $providerBaseCurrency, $start, $end);
-            $baseRates = $this->getRatesMap($provider->getId(), $baseCurrency, $providerBaseCurrency, $start, $end);
+            $targetRates = $this->getRatesMap($provider, $currency, $providerBaseCurrency, $start, $end);
+            $baseRates = $this->getRatesMap($provider, $baseCurrency, $providerBaseCurrency, $start, $end);
 
             foreach ($targetRates as $date => $targetRate) {
                 if (isset($baseRates[$date]) && 0 !== BcMath::comp($baseRates[$date], '0', $this->currencyPrecision)) {
@@ -49,40 +56,66 @@ readonly class ProviderManager
                 }
             }
         } else {
-            $rates = $this->getRatesMap($provider->getId(), $currency, $baseCurrency, $start, $end);
+            $rates = $this->getRatesMap($provider, $currency, $baseCurrency, $start, $end);
+        }
+
+        if (FrequencyEnum::Daily !== $group) {
+            $rates = $this->groupRates($rates, $group);
         }
 
         $response = new TimeseriesResponse(
             baseCurrency: $baseCurrency,
             currency: $currency,
-            startDate: $start->format('Y-m-d'),
-            endDate: $end->format('Y-m-d'),
+            startDate: $start->format(Date::FORMAT),
+            endDate: $end->format(Date::FORMAT),
             rates: $rates
         );
 
-        $this->timeseriesCache->set($start, $end, $providerEnum, $baseCurrency, $currency, $response);
+        $this->timeseriesCache->set($start, $end, $providerEnum, $baseCurrency, $currency, $response, $group);
 
         return $response;
     }
 
     /**
+     * @param array<string, string> $rates
+     *
      * @return array<string, string>
      */
-    private function getRatesMap(int $providerId, string $currency, string $baseCurrency, \DateTimeImmutable $start, \DateTimeImmutable $end): array
+    private function groupRates(array $rates, FrequencyEnum $group): array
     {
-        $entities = $this->repository->findRatesByPeriod($providerId, $currency, $baseCurrency, $start, $end);
+        $grouped = [];
+        foreach ($rates as $date => $rate) {
+            $dt = new \DateTimeImmutable($date);
+            if (FrequencyEnum::Weekly === $group) {
+                $key = $dt->modify('monday this week')->format(Date::FORMAT);
+            } elseif (FrequencyEnum::Monthly === $group) {
+                $key = $dt->format('Y-m-01');
+            } else {
+                $key = $date;
+            }
+
+            $grouped[$key] = $rate;
+        }
+
+        return $grouped;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function getRatesMap(ProviderRateInterface $provider, string $currency, string $baseCurrency, \DateTimeImmutable $start, \DateTimeImmutable $end, bool $invert = false): array
+    {
+        $entities = $this->repository->findRatesByPeriod($provider, $currency, $baseCurrency, $start, $end);
         $map = [];
         foreach ($entities as $entity) {
-            $map[$entity->getDate()->format('Y-m-d')] = $entity->getRate();
+            $map[$entity->getDate()->format(Date::FORMAT)] = $entity->getRate($invert);
         }
 
         return $map;
     }
 
-    public function getRate(\DateTimeImmutable $date, string $currency, string $baseCurrency, ProviderEnum $providerEnum = ProviderEnum::CBR): RateResponse
+    public function getRate(\DateTimeImmutable $date, string $currency, string $baseCurrency, ProviderEnum $providerEnum = ProviderEnum::ECB): RateResponse
     {
-        $date = $this->getCorrectedDay($providerEnum, $date);
-
         if ($cacheResponse = $this->rateCache->get($date, $providerEnum, $baseCurrency, $currency)) {
             return $cacheResponse;
         }
@@ -90,30 +123,23 @@ readonly class ProviderManager
         $provider = $this->providerRegistry->get($providerEnum);
         $providerBaseCurrency = $provider->getBaseCurrency();
 
-        if ($providerBaseCurrency !== $baseCurrency) {
+        if ($providerBaseCurrency === $currency) {
+            $response = $this->fetchDirectRate($provider, $date, $baseCurrency, true);
+        } elseif ($providerBaseCurrency !== $baseCurrency) {
             $response = $this->calculateCrossRate($provider, $date, $currency, $baseCurrency);
         } else {
             $response = $this->fetchDirectRate($provider, $date, $currency);
         }
 
-        if (null !== $response->diff) {
+        if ($response->isFullData()) {
+            // Если данные полные - кешируем
             $this->rateCache->set($date, $providerEnum, $baseCurrency, $currency, $response);
         }
 
         return $response;
     }
 
-    public function getCorrectedDay(ProviderEnum $providerEnum, \DateTimeImmutable $date): \DateTimeImmutable
-    {
-        $correctedDay = $this->correctedDayCache->get($providerEnum, $date);
-        if ($correctedDay) {
-            return $correctedDay;
-        }
-
-        return $date;
-    }
-
-    private function calculateCrossRate(ProviderInterface $provider, \DateTimeImmutable $date, string $currency, string $baseCurrency): RateResponse
+    private function calculateCrossRate(ProviderRateInterface $provider, \DateTimeImmutable $date, string $currency, string $baseCurrency): RateResponse
     {
         $providerBaseCurrency = $provider->getBaseCurrency();
 
@@ -143,8 +169,8 @@ readonly class ProviderManager
 
         return new RateResponse(
             rate: $rate,
-            diff: $diff,
             date: $targetTo->date,
+            diff: $diff,
             dateDiff: $dateDiff,
         );
     }
@@ -161,37 +187,28 @@ readonly class ProviderManager
         return BcMath::sub($rate, $diff, $this->currencyPrecision);
     }
 
-    private function fetchDirectRate(ProviderInterface $provider, \DateTimeImmutable $date, string $currency): RateResponse
+    private function fetchDirectRate(ProviderRateInterface $provider, \DateTimeImmutable $date, string $currency, bool $invert = false): RateResponse
     {
-        $rateEntity = $this->repository->findOneByDateAndCurrency($provider->getId(), $currency, $provider->getBaseCurrency(), $date);
+        $rates = $this->repository->findTwoLastRates($provider, $currency, $provider->getBaseCurrency(), $date);
 
-        if (!$rateEntity) {
+        if (!$rates) {
             throw new RateNotFoundException($currency, $provider->getBaseCurrency());
         }
 
-        return $this->createResponse($provider, $rateEntity);
-    }
-
-    private function createResponse(ProviderInterface $provider, ExchangeRate $rateEntity): RateResponse
-    {
         $diff = null;
         $dateDiff = null;
-        $previousDate = $rateEntity->getDate()->modify('-1 day');
-        $previousDate = $this->getCorrectedDay($provider->getEnum(), $previousDate);
 
-        $previousRate = $this->repository->findOneByDateAndCurrency($provider->getId(), $rateEntity->getCurrency(), $rateEntity->getBaseCurrency(), $previousDate);
-
-        if ($previousRate) {
-            $rate = $this->requireNumericString($rateEntity->getRate(), 'current rate');
-            $previous = $this->requireNumericString($previousRate->getRate(), 'previous rate');
-            $diff = BcMath::sub($rate, $previous, $this->currencyPrecision);
-            $dateDiff = $previousRate->getDate()->format('Y-m-d');
+        if (isset($rates[1])) {
+            $current = $this->requireNumericString($rates[0]->getRate($invert), 'current rate');
+            $previous = $this->requireNumericString($rates[1]->getRate($invert), 'previous rate');
+            $diff = BcMath::sub($current, $previous, $this->currencyPrecision);
+            $dateDiff = $rates[1]->getDate()->format(Date::FORMAT);
         }
 
         return new RateResponse(
-            rate: $rateEntity->getRate(),
+            rate: $rates[0]->getRate($invert),
+            date: $rates[0]->getDate()->format(Date::FORMAT),
             diff: $diff,
-            date: $rateEntity->getDate()->format('Y-m-d'),
             dateDiff: $dateDiff,
         );
     }

@@ -7,9 +7,11 @@ namespace App\MessageHandler;
 use App\Contract\Cache\RateLimitCacheInterface;
 use App\Enum\FetchStatusEnum;
 use App\Exception\DisabledProviderException;
+use App\Exception\RetryByDateException;
 use App\Message\FetchRateMessage;
 use App\Service\ProviderImporter;
 use App\Service\ProviderRegistry;
+use App\Util\Date;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -39,7 +41,7 @@ class FetchRateHandler
         if ($this->logger instanceof \Monolog\Logger) {
             $processor = function (\Monolog\LogRecord $record) use ($message): \Monolog\LogRecord {
                 return $record->with(context: array_merge($record->context, [
-                    'provider' => $message->provider->value,
+                    'provider' => $message->providerEnum->value,
                     'date' => $message->date,
                 ]));
             };
@@ -47,35 +49,46 @@ class FetchRateHandler
         }
 
         try {
-            // $this->logger->info('---RUN---:', ['date' => $message->date->format('Y-m-d')]);
-            $provider = $this->providerRegistry->get($message->provider);
-            [$status, $correctedDate] = $this->importer->fetchAndSaveRates($message->provider, $message->date);
-            if ($message->loadPrevious) {
+            $provider = $this->providerRegistry->get($message->providerEnum);
+            [$status, $correctedDate] = $this->importer->fetchAndSaveRates($provider, $message->date);
+            if ($message->loadPrevious > 0) {
                 $noRate = 0;
-                if (FetchStatusEnum::NO_MORE === $status) {
+                if (FetchStatusEnum::EMPTY === $status) {
                     if ($message->noRate > 10) {
-                        $this->logger->info('No more rates available for :'.$message->provider->value);
+                        $this->logger->info('!!! No more rates available for :'.$message->providerEnum->value);
 
                         return;
                     }
                     $noRate += $message->noRate + 1;
                 }
                 // загружаем предыдущий день
-                $delaySecund = 0;
+                $delaySecond = 0;
                 if (FetchStatusEnum::SUCCESS === $status) {
                     // Если данные были получены, выполняем загрузку предыдущего дня с задержкой в секунду
-                    $delaySecund = $provider->getRequestDelay();
+                    $delaySecond = $provider->getRequestDelay();
                 }
+
                 $dateNext = $message->date->modify('-1 day');
-                if ($correctedDate < $dateNext) {
-                    $dateNext = $correctedDate;
+                $dayDiff = Date::getDayDiff($correctedDate, $dateNext);
+                if ($dayDiff) {
+                    $dateNext = $correctedDate->modify('-1 day');
+                    $loadPrevious = $message->loadPrevious - $dayDiff;
+                } else {
+                    $loadPrevious = $message->loadPrevious - 1;
                 }
-                $messageNext = new FetchRateMessage($dateNext, $message->provider, --$message->loadPrevious, $noRate);
-                // $this->logger->info('---NEXT---:', ['date' => $dateNext->format('Y-m-d')]);
-                $this->bus->dispatch($messageNext, $messageNext->getStamps($delaySecund, $this->rateLimitCache, $provider));
+                $messageNext = new FetchRateMessage($dateNext, $message->providerEnum, $loadPrevious, $noRate);
+                $this->bus->dispatch($messageNext, $messageNext->getStamps($delaySecond, $this->rateLimitCache, $provider));
+                $this->logger->info('+ FetchRateMessage :'.$dateNext->format(Date::FORMAT));
+            } else {
+                $this->logger->info('!!! Queue done:'.$message->providerEnum->value);
             }
         } catch (DisabledProviderException $e) {
-            // skipp
+            // skip
+        } catch (RetryByDateException $e) {
+            $loadPrevious = max(0, $message->loadPrevious);
+            $messageNext = new FetchRateMessage($e->availableDate, $message->providerEnum, $loadPrevious, $message->noRate + 1);
+            $this->bus->dispatch($messageNext, $messageNext->getStamps($provider->getRequestDelay(), $this->rateLimitCache, $provider));
+            $this->logger->info('++ FetchRateMessage :'.$e->availableDate->format(Date::FORMAT));
         } catch (\Throwable $e) {
             $delayMinutes = 10;
             $context = [
@@ -140,8 +153,7 @@ class FetchRateHandler
                 $this->logger->popProcessor();
             }
         }
-        // rate limit
-        // $this->logger->info('Sleep '.$this->fetchRateInterval);
-        // sleep($this->fetchRateInterval);
+
+        // sleep(8);//temp
     }
 }

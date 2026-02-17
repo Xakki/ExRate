@@ -4,22 +4,29 @@ declare(strict_types=1);
 
 namespace App\Provider;
 
-use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
+use App\DTO\RateData;
 use App\Enum\ProviderEnum;
+use App\Service\AbstractProviderRate;
 use App\Util\BcMath;
+use App\Util\Currencies;
+use App\Util\Date;
+use App\Util\UrlTemplateTrait;
+use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * @see https://cbu.uz/en/arkhiv-kursov-valyut/
  */
-final readonly class RcbProvider implements ProviderInterface
+final readonly class RcbProvider extends AbstractProviderRate
 {
-    public const string BASE_URL = 'https://cbu.uz/common/json';
+    use UrlTemplateTrait;
 
     public function __construct(
-        private HttpClientInterface $httpClient,
-        private int $id,
+        protected HttpClientInterface $httpClient,
+        protected LoggerInterface $logger,
+        protected int $id,
+        private string $url,
         private int $currencyPrecision,
     ) {
     }
@@ -29,11 +36,6 @@ final readonly class RcbProvider implements ProviderInterface
         return 'provider.rcb';
     }
 
-    public function getId(): int
-    {
-        return $this->id;
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::RCB;
@@ -41,7 +43,7 @@ final readonly class RcbProvider implements ProviderInterface
 
     public function getBaseCurrency(): string
     {
-        return 'UZS';
+        return Currencies::UZS;
     }
 
     public function getHomePage(): string
@@ -54,17 +56,11 @@ final readonly class RcbProvider implements ProviderInterface
         return 'Central Bank of the Republic of Uzbekistan';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
     {
-        $url = self::BASE_URL.'/?date='.$date->format('d.m.Y');
+        $url = $this->prepareUrl($this->url, $date, $this->getBaseCurrency());
 
-        $response = $this->httpClient->request('GET', $url);
-        $content = $response->getContent();
-        $data = json_decode($content, true);
-
-        if (!is_array($data)) {
-            throw new \RuntimeException('Failed to parse RCB JSON response');
-        }
+        $data = $this->jsonRequest($url);
 
         $rates = [];
         $responseDate = $date;
@@ -74,38 +70,31 @@ final readonly class RcbProvider implements ProviderInterface
             $rateStr = $item['Rate'];
             $nominal = $item['Nominal'];
 
-            $rates[$code] = BcMath::div($rateStr, $nominal, $this->currencyPrecision);
+            $rates[$code] = new RateData(BcMath::div($rateStr, $nominal, $this->currencyPrecision));
 
             if (isset($item['Date'])) {
-                $responseDate = \DateTimeImmutable::createFromFormat('d.m.Y', $item['Date']) ?: $responseDate;
+                try {
+                    $responseDate = Date::createFromFormat('d.m.Y', $item['Date']);
+                } catch (\App\Exception\BadDateException) {
+                    // TODO: log notice
+                    // keep previous responseDate
+                }
             }
         }
 
-        return new GetRatesResult($this->getId(), $this->getBaseCurrency(), $responseDate, $rates);
-    }
-
-    public function isActive(): bool
-    {
-        return true;
+        return new GetRatesResult($this, $this->getBaseCurrency(), $responseDate, $rates);
     }
 
     public function getAvailableCurrencies(): array
     {
-        return ['AED', 'AFN', 'AMD', 'ARS', 'AUD', 'AZN', 'BDT', 'BGN', 'BHD', 'BND', 'BRL', 'BYN', 'CAD', 'CHF', 'CNY', 'CUP', 'CZK', 'DKK', 'DZD', 'EGP', 'EUR', 'GBP', 'GEL', 'HKD', 'HUF', 'IDR', 'ILS', 'INR', 'IQD', 'IRR', 'ISK', 'JOD', 'JPY', 'KHR', 'KGS', 'KRW', 'KWD', 'KZT', 'LAK', 'LBP', 'LYD', 'MAD', 'MDL', 'MMK', 'MNT', 'MXN', 'MYR', 'NOK', 'NZD', 'OMR', 'PHP', 'PKR', 'PLN', 'QAR', 'RON', 'RSD', 'RUB', 'SAR', 'SDG', 'SEK', 'SGD', 'SYP', 'THB', 'TJS', 'TMT', 'TND', 'TRY', 'UAH', 'USD', 'UYU', 'VES', 'VND', 'XDR', 'YER', 'ZAR'];
+        return [Currencies::AED, Currencies::AFN, Currencies::AMD, Currencies::ARS, Currencies::AUD, Currencies::AZN, Currencies::BDT, Currencies::BGN, Currencies::BHD, Currencies::BND, Currencies::BRL, Currencies::BYN, Currencies::CAD, Currencies::CHF, Currencies::CNY, Currencies::CUP, Currencies::CZK, Currencies::DKK, Currencies::DZD, Currencies::EGP, Currencies::EUR, Currencies::GBP, Currencies::GEL, Currencies::HKD, Currencies::HUF, Currencies::IDR, Currencies::ILS, Currencies::INR, Currencies::IQD, Currencies::IRR, Currencies::ISK, Currencies::JOD, Currencies::JPY, Currencies::KHR, Currencies::KGS, Currencies::KRW, Currencies::KWD, Currencies::KZT, Currencies::LAK, Currencies::LBP, Currencies::LYD, Currencies::MAD, Currencies::MDL, Currencies::MMK, Currencies::MNT, Currencies::MXN, Currencies::MYR, Currencies::NOK, Currencies::NZD, Currencies::OMR, Currencies::PHP, Currencies::PKR, Currencies::PLN, Currencies::QAR, Currencies::RON, Currencies::RSD, Currencies::RUB, Currencies::SAR, Currencies::SDG, Currencies::SEK, Currencies::SGD, Currencies::SYP, Currencies::THB, Currencies::TJS, Currencies::TMT, Currencies::TND, Currencies::TRY, Currencies::UAH, Currencies::USD, Currencies::UYU, Currencies::VES, Currencies::VND, Currencies::XDR, Currencies::YER, Currencies::ZAR];
     }
 
-    public function getRequestLimit(): int
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
     {
-        return 0;
-    }
-
-    public function getRequestLimitPeriod(): int
-    {
-        return 0;
-    }
-
-    public function getRequestDelay(): int
-    {
-        return 2;
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

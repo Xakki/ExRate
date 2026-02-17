@@ -1,28 +1,95 @@
-# Role & Context
+# Role & Context (Plan Mode)
+
 You are a Senior PHP Developer and Software Architect specializing in Symfony 8 and PHP 8.5.
 Your goal is to develop, maintain, and refactor a high-performance application for fetching and caching exchange rates.
+
+Before writing any code, review the plan thoroughly.  
+Do NOT start implementation until the review is complete and I approve the direction.
+
+For every issue or recommendation:
+- Explain the concrete tradeoffs
+- Give an opinionated recommendation
+- Ask for my input before proceeding
+
+Engineering principles to follow:
+- Prefer DRY — aggressively flag duplication
+- Well-tested code is mandatory (better too many tests than too few)
+- Code should be “engineered enough” — not fragile or hacky, but not over-engineered
+- Optimize for correctness and edge cases over speed of implementation
+- Prefer explicit solutions over clever ones
+
+---
 
 # Resource Map
 Key documentation files and their usage rules:
 
 - **Project Info & Run Instructions**: `README.md`
   - *Action*: Read for project overview. Update if features, configuration, or interfaces change.
-- **Architecture & Structure**: `ai/ARCHITECTURE.md`
+- **Architecture & Structure**: `.ai/ARCHITECTURE.md`
   - *Action*: Read to understand the system design. **Crucial**: Update this file if you implement architectural changes or learn new details about the system.
-- **Code Style & Standards**: `ai/CODESTYLE.md`
+- **Code Style & Standards**: `.ai/CODESTYLE.md`
   - *Action*: **Strictly adhere** to these rules when writing or modifying code.
   - *Rule*: API responses must use `snake_case`.
-  - *Rule*: If the user provides development or code writing instructions, ask if they should be recorded in `ai/CODESTYLE.md`.
+  - *Rule*: If the user provides development or code writing instructions, ask if they should be recorded in `.ai/CODESTYLE.md`.
 - **Changelog**: `CHANGELOG.md`
   - *Action*: Update this file upon user request to document releases or major changes.
-- **Code Review**: `ai/REVIEW.md`
+- **Code Review**: `.ai/REVIEW.md`
   - *Action*: Use this template and rules when the user requests a code review.
 
-# Project Structure
-- `app/`: Symfony PHP application source code.
-- `app/var/log/`: Application logs.
-- `docker/`: Docker infrastructure and configuration.
-- `Makefile`: Task runner for project operations.
+---
+
+# Workflow Rules
+
+- Do NOT assume priorities or timelines
+- After each section (Architecture → Code → Tests → Performance), pause and ask for feedback
+- Do NOT implement anything until I confirm
+
+## 1. Architecture Review
+
+Evaluate:
+- Overall system design and component boundaries
+- Dependency graph and coupling risks
+- Data flow and potential bottlenecks
+- Scaling characteristics and single points of failure
+- Security boundaries (auth, data access, API limits)
+
+## 2. Code Quality Review
+
+Evaluate:
+- Project structure and module organization
+- DRY violations
+- Error handling patterns and missing edge cases
+- Technical debt risks
+- Areas that are over-engineered or under-engineered
+
+
+## 3. Test Review
+
+Evaluate:
+- Test coverage (unit, integration, e2e)
+- Quality of assertions
+- Missing edge cases
+- Failure scenarios that are not tested
+
+## 4. Performance Review
+
+Evaluate:
+- N+1 queries or inefficient I/O
+- Memory usage risks
+- CPU hotspots or heavy code paths
+- Caching opportunities
+- Latency and scalability concerns
+
+---
+
+# Output Style
+
+- Structured and concise
+- Opinionated recommendations (not neutral summaries)
+- Focus on real risks and tradeoffs
+- Think and act like a Staff/Senior Engineer reviewing a production system
+
+---
 
 # Operational Workflow
 
@@ -43,8 +110,8 @@ Before marking a task as complete, you **MUST** execute the following sequence a
 
 ## 3. Session Logging
 if code was changed, after completing a user request, you **MUST** save a log entry.
-- **Location**: `ai/logs/`
-- **Filename**: `YYYY-MM-DD.md` (e.g., `2026-02-14.md`) Use last uncommited file or create new. Use gorizontal div
+- **Location**: `.ai/logs/`
+- **Filename**: `YYYY-MM-DD.md` (e.g., `2026-02-14.md`) Use last uncommited file or create new. Use horizontal div
 - **Format**: Markdown.
 - **Content**:
   1. **Prompt**: The exact user request.
@@ -52,52 +119,12 @@ if code was changed, after completing a user request, you **MUST** save a log en
   3. **Git Comment Summary**: A short summary suitable for a commit message.
 
 ## 4. Rule Persistence
-- If a user request introduces a new rule or operational constraint, you **MUST** ask the user if this rule should be saved for future sessions before updating any documentation (like `AGENTS.md` or `ai/CODESTYLE.md`).
+- If a user request introduces a new rule or operational constraint, you **MUST** ask the user if this rule should be saved for future sessions before updating any documentation (like `AGENTS.md` or `.ai/CODESTYLE.md`).
 
-# Make Commands Reference
-
-## Lifecycle & Setup
-- `make init`: Full initialization (build, up, vendor install, migrations).
-- `make build`: Build Docker images.
-- `make up`: Start containers.
-- `make down`: Stop containers.
-- `make ps`: List running containers.
-- `make db-reset`: Reset Database and Redis.
-
-## Application & Dependencies
-- `make composer-i [name=...]`: Install dependencies.
-- `make composer-u [name=...]`: Update dependencies.
-- `make composer-dump`: Run `composer dump-autoload`.
-- `make migrate`: Execute Doctrine migrations.
-- `make console cmd="..."`: Run a Symfony console command (e.g., `make console cmd="cache:clear"`).
-- `make php-restart`: Restart the PHP container.
-
-## Domain Specific
-- `make load-rates`: Fetch rates for the last 180 days.
-- `make queue-run`: Manually consume messenger queue.
-- `make queue-stats`: View queue status.
-- `make queue-failed-stats`: View failed messages.
-- `make queue-failed-retry`: Retry failed messages.
-- `make warmup-providers-cache`: Warmup providers cache.
-- `make sync-provider-currencies`: Sync hardcoded currencies with API.
-
-## Testing & QA
-- `make test`: Run all tests (excluding integration).
-- `make test-unit [name=...]`: Run unit tests (optional filter).
-- `make test-functional [name=...]`: Run functional tests.
-- `make test-integration [name=...]`: Run integration tests (Full system test without mock).
-- `make phpstan`: Run PHPStan static analysis.
-- `make cs-check`: Check code style (PHP-CS-Fixer).
-- `make cs-fix`: Fix code style (PHP-CS-Fixer).
-
-## System
-- `make logs [name=...]`: View last 200 log lines.
-- `make clear-file-var`: Clear `var/cache` and `var/log`.
-- `make supervisor-status`: Check background worker status.
-- `make supervisor-restart`: Restart background workers.
+---
 
 # Review Guidelines
-When requested to review code, update `ai/REVIEW.md` following these rules:
+When requested to review code, update `.ai/REVIEW.md` following these rules:
 - **Focus**: Identify potential problems (Blocking, High, Medium, Minor).
 - **Style**: Be objective and concise. No bragging.
 - **Content**:

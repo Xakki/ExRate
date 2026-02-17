@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Service;
 
-use App\Contract\ProviderInterface;
-use App\DTO\ProviderDTO;
+use App\Contract\ProviderRateInterface;
+use App\Contract\RateRepositoryInterface;
 use App\Enum\ProviderEnum;
 use App\Exception\DisabledProviderException;
+use App\Response\ProviderResponse;
+use App\Util\Date;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutowireLocator;
@@ -23,10 +25,11 @@ readonly class ProviderRegistry
         private ContainerInterface $locator,
         private CacheInterface $fastCache,
         private LoggerInterface $logger,
+        private RateRepositoryInterface $exchangeRateRepository,
     ) {
     }
 
-    public function get(ProviderEnum $provider): ProviderInterface
+    public function get(ProviderEnum $provider): ProviderRateInterface
     {
         $serviceName = 'provider.'.$provider->value;
 
@@ -34,7 +37,7 @@ readonly class ProviderRegistry
             throw new DisabledProviderException(sprintf('Rate provider %s not found', $provider->value));
         }
 
-        /** @var ProviderInterface $service */
+        /** @var ProviderRateInterface $service */
         $service = $this->locator->get($serviceName);
 
         if (!$service->isActive()) {
@@ -44,8 +47,24 @@ readonly class ProviderRegistry
         return $service;
     }
 
+    public function getById(int $id): ProviderRateInterface
+    {
+        foreach (ProviderEnum::cases() as $providerEnum) {
+            try {
+                $provider = $this->get($providerEnum);
+                if ($provider->getId() === $id) {
+                    return $provider;
+                }
+            } catch (DisabledProviderException) {
+                continue;
+            }
+        }
+
+        throw new \InvalidArgumentException(sprintf('Provider with ID %d not found', $id));
+    }
+
     /**
-     * @return ProviderDTO[]
+     * @return ProviderResponse[]
      */
     public function getAll(bool $force = false): array
     {
@@ -54,7 +73,7 @@ readonly class ProviderRegistry
         }
 
         return $this->fastCache->get(self::CACHE_KEY, function (ItemInterface $item) {
-            // $item->expiresAfter(3600);
+            $item->expiresAfter(3600);
             $providers = [];
             foreach (ProviderEnum::cases() as $providerEnum) {
                 try {
@@ -63,12 +82,13 @@ readonly class ProviderRegistry
                     $this->logger->info($e->getMessage(), ['provider' => $providerEnum->value]);
                     continue;
                 }
-                $providers[] = new ProviderDTO(
+                $providers[] = new ProviderResponse(
                     $provider->getEnum()->value,
                     $provider->getHomePage(),
                     $provider->getDescription(),
-                    $provider->getAvailableCurrencies(),
                     $provider->getBaseCurrency(),
+                    $provider->getAvailableCurrencies(),
+                    $this->exchangeRateRepository->getMinDate($provider)?->format(Date::FORMAT)
                 );
             }
 

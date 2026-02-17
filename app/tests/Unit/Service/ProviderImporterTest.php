@@ -5,14 +5,16 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service;
 
 use App\Contract\Cache\RateLimitCacheInterface;
-use App\Contract\Cache\SkipDayCacheInterface;
-use App\Contract\ProviderInterface;
+use App\Contract\ProviderRateInterface;
+use App\Contract\RateEntityInterface;
+use App\Contract\RateRepositoryInterface;
 use App\DTO\GetRatesResult;
+use App\DTO\RateData;
 use App\Enum\ProviderEnum;
-use App\Repository\ExchangeRateRepository;
+use App\Exception\NotAvailableMethod;
 use App\Service\ProviderImporter;
-use App\Service\ProviderManager;
-use App\Service\ProviderRegistry;
+use App\Util\Currencies;
+use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -21,14 +23,8 @@ use Psr\Log\LoggerInterface;
 #[AllowMockObjectsWithoutExpectations]
 class ProviderImporterTest extends TestCase
 {
-    /** @var ProviderRegistry&MockObject */
-    private ProviderRegistry $providerRegistry;
-
-    /** @var ExchangeRateRepository&MockObject */
-    private ExchangeRateRepository $repository;
-
-    /** @var SkipDayCacheInterface&MockObject */
-    private SkipDayCacheInterface $correctedDayCache;
+    /** @var RateRepositoryInterface&MockObject */
+    private RateRepositoryInterface $repository;
 
     /** @var RateLimitCacheInterface&MockObject */
     private RateLimitCacheInterface $rateLimitCache;
@@ -36,95 +32,127 @@ class ProviderImporterTest extends TestCase
     /** @var LoggerInterface&MockObject */
     private LoggerInterface $logger;
 
-    /** @var ProviderManager&MockObject */
-    private ProviderManager $provider;
+    /** @var EntityManagerInterface&MockObject */
+    private EntityManagerInterface $entityManager;
 
     private ProviderImporter $importer;
 
     protected function setUp(): void
     {
-        $this->providerRegistry = $this->createMock(ProviderRegistry::class);
-        $this->repository = $this->createMock(ExchangeRateRepository::class);
+        $this->repository = $this->createMock(RateRepositoryInterface::class);
 
-        $this->correctedDayCache = $this->createMock(SkipDayCacheInterface::class);
         $this->rateLimitCache = $this->createMock(RateLimitCacheInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
-        $this->provider = $this->createMock(ProviderManager::class);
+        $this->entityManager = $this->createMock(EntityManagerInterface::class);
 
         $this->importer = new ProviderImporter(
-            $this->providerRegistry,
-            $this->repository,
-            $this->correctedDayCache,
-            $this->rateLimitCache,
-            $this->logger,
-            $this->provider
+            repository: $this->repository,
+            rateLimitCache: $this->rateLimitCache,
+            logger: $this->logger,
+            entityManager: $this->entityManager,
         );
     }
 
     public function testFetchAndSaveRatesWhenRatesExist(): void
     {
         $date = (new \DateTimeImmutable('2024-01-01'))->setTime(12, 0);
-        $providerEnum = ProviderEnum::CBR;
 
-        $provider = $this->createMock(ProviderInterface::class);
-        $provider->method('getBaseCurrency')->willReturn('RUR');
+        $provider = $this->createMock(ProviderRateInterface::class);
+        $provider->method('getBaseCurrency')->willReturn(Currencies::EUR);
         $provider->method('getId')->willReturn(1);
+        $provider->method('getEnum')->willReturn(ProviderEnum::ECB);
 
-        $this->providerRegistry->method('get')->with($providerEnum)->willReturn($provider);
-        $this->provider->method('getCorrectedDay')->with($providerEnum, $date)->willReturn($date);
-        $this->repository->method('existRates')->with(1, 'RUR', $date)->willReturn(true);
+        $rateEntity = $this->createMock(RateEntityInterface::class);
+        $rateEntity->method('getDate')->willReturn($date);
+
+        $this->repository->method('findOneByDateRange')
+            ->with($provider, $provider->getBaseCurrency(), $this->anything(), $this->anything())
+            ->willReturn($rateEntity);
+
+        $this->repository->method('getMinDate')->willReturn($date);
 
         $this->repository->expects($this->never())->method('saveRatesBatch');
 
-        $this->importer->fetchAndSaveRates($providerEnum, $date);
+        $this->importer->fetchAndSaveRates($provider, $date);
     }
 
     public function testFetchAndSaveRatesNewRates(): void
     {
         $date = (new \DateTimeImmutable('2024-01-01'))->setTime(12, 0);
-        $providerEnum = ProviderEnum::CBR;
-        $rates = ['USD' => '75.0', 'EUR' => '90.0'];
+        $providerEnum = ProviderEnum::ECB;
+        $rates = [Currencies::USD => new RateData('75.0'), Currencies::EUR => new RateData('90.0')];
 
-        $provider = $this->createMock(ProviderInterface::class);
-        $provider->method('getBaseCurrency')->willReturn('RUR');
+        $provider = $this->createMock(ProviderRateInterface::class);
+        $provider->method('getEnum')->willReturn($providerEnum);
+        $provider->method('getAvailableCurrencies')->willReturn([Currencies::USD, Currencies::EUR]);
+        $provider->method('getBaseCurrency')->willReturn(Currencies::RUB);
         $provider->method('getId')->willReturn(1);
-        $provider->method('getRates')->with($date)->willReturn(new GetRatesResult(1, 'RUR', $date, $rates));
-
-        $this->providerRegistry->method('get')->with($providerEnum)->willReturn($provider);
-        $this->provider->method('getCorrectedDay')->with($providerEnum, $date)->willReturn($date);
-        $this->repository->method('existRates')->with(1, 'RUR', $date)->willReturn(false);
+        $provider->method('getRatesByRangeDate')->willThrowException(new NotAvailableMethod());
+        $provider->method('getRatesByDate')->with($date)->willReturn(new GetRatesResult($provider, Currencies::RUB, $date, $rates));
 
         $this->repository->expects($this->once())
             ->method('saveRatesBatch')
-            ->with(1, 'RUR', $this->anything(), $rates);
+            ->with($provider, Currencies::RUB, $this->anything(), $rates);
 
-        $this->importer->fetchAndSaveRates($providerEnum, $date);
+        $this->importer->fetchAndSaveRates($provider, $date);
     }
 
-    public function testFetchAndSaveRatesWithDateCorrection(): void
+    public function testFetchAndSaveRatesWithCurrencyMismatch(): void
     {
-        $expectDate = (new \DateTimeImmutable('2024-01-02'))->setTime(12, 0);
-        $actualDate = (new \DateTimeImmutable('2024-01-01'))->setTime(12, 0);
+        $date = (new \DateTimeImmutable('2024-01-01'))->setTime(12, 0);
         $providerEnum = ProviderEnum::CBR;
-        $rates = ['USD' => '75.0'];
+        $rates = [Currencies::USD => new RateData('75.0')]; // Only USD
+        $availableCurrencies = [Currencies::USD, Currencies::RUB]; // USD and RUB available
 
-        $provider = $this->createMock(ProviderInterface::class);
-        $provider->method('getBaseCurrency')->willReturn('RUR');
+        $provider = $this->createMock(ProviderRateInterface::class);
+        $provider->method('getEnum')->willReturn($providerEnum);
+        $provider->method('getAvailableCurrencies')->willReturn($availableCurrencies);
+        $provider->method('getBaseCurrency')->willReturn(Currencies::EUR);
         $provider->method('getId')->willReturn(1);
-        $provider->method('getRates')->with($actualDate)->willReturn(new GetRatesResult(1, 'RUR', $actualDate, $rates));
+        $provider->method('getRatesByRangeDate')->willThrowException(new NotAvailableMethod());
+        $provider->method('getRatesByDate')->with($date)->willReturn(new GetRatesResult($provider, $provider->getBaseCurrency(), $date, $rates));
 
-        $this->providerRegistry->method('get')->with($providerEnum)->willReturn($provider);
-        $this->provider->method('getCorrectedDay')->with($providerEnum, $expectDate)->willReturn($actualDate);
-        $this->repository->method('existRates')->with(1, 'RUR', $actualDate)->willReturn(false);
+        $this->logger->expects($this->atLeastOnce())
+            ->method('info')
+            ->willReturnCallback(function ($message, $context) {
+                if (str_contains($message, 'Currency mismatch')) {
+                    $this->assertEquals('cbr', $context['provider']);
+                    $this->assertEquals([Currencies::RUB], $context['missing_in_fetched']);
+                    $this->assertEmpty($context['extra_in_fetched']);
+                }
+            });
 
-        $this->correctedDayCache->expects($this->once())
-            ->method('set')
-            ->with($providerEnum, $expectDate, $actualDate);
+        $this->importer->fetchAndSaveRates($provider, $date);
+    }
 
-        $this->repository->expects($this->once())
-            ->method('saveRatesBatch')
-            ->with(1, 'RUR', $this->anything(), $rates);
+    public function testFetchAndSaveRatesWithRange(): void
+    {
+        $date = (new \DateTimeImmutable('2024-01-10'))->setTime(12, 0);
+        $providerEnum = ProviderEnum::ECB;
+        $ratesDay1 = [Currencies::USD => new RateData('1.1')];
+        $ratesDay2 = [Currencies::USD => new RateData('1.2')];
 
-        $this->importer->fetchAndSaveRates($providerEnum, $expectDate);
+        $date1 = new \DateTimeImmutable('2024-01-01');
+        $date2 = new \DateTimeImmutable('2024-01-10');
+
+        $provider = $this->createMock(ProviderRateInterface::class);
+        $provider->method('getEnum')->willReturn($providerEnum);
+        $provider->method('getId')->willReturn(1);
+        $provider->method('getPeriodDays')->willReturn(10);
+        $provider->method('getBaseCurrency')->willReturn(Currencies::EUR);
+        $provider->method('getRatesByRangeDate')->willReturn([
+            new GetRatesResult($provider, Currencies::EUR, $date1, $ratesDay1),
+            new GetRatesResult($provider, Currencies::EUR, $date2, $ratesDay2),
+        ]);
+
+        $this->repository->expects($this->exactly(2))
+            ->method('saveRatesBatch');
+        $this->repository->expects($this->exactly(1))
+            ->method('findOneByDateRange');
+
+        $result = $this->importer->fetchAndSaveRates($provider, $date);
+
+        $this->assertEquals(\App\Enum\FetchStatusEnum::SUCCESS, $result[0]);
+        $this->assertEquals($date->modify('-'.$provider->getPeriodDays().' day'), $result[1]);
     }
 }

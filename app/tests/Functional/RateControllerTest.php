@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Tests\Functional;
 
 use App\Contract\Cache\RateCacheInterface;
-use App\Entity\ExchangeRate;
-use App\Repository\ExchangeRateRepository;
+use App\Contract\ProviderRateInterface;
+use App\Contract\RateRepositoryInterface;
+use App\Entity\Rate;
+use App\Repository\ProviderRateRepository;
 use App\Tests\WebTestCase;
+use App\Util\Currencies;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\Messenger\Envelope;
@@ -19,7 +22,7 @@ class RateControllerTest extends WebTestCase
     public function testGetRateValidationFail(): void
     {
         $client = static::createClient();
-        $this->setUpMocks($client, 0, new \DateTimeImmutable('2026-02-10'), new \DateTimeImmutable('2026-02-09'));
+        $this->setUpMocks($client, 0, new \DateTimeImmutable('2026-02-10'));
 
         $resp = $this->jsonRequest($client, 'GET', '/api/v1/rate', 400, [
             ['level' => 'error', 'message' => '/This value should not be blank/'],
@@ -28,8 +31,8 @@ class RateControllerTest extends WebTestCase
         $this->assertArrayHasKey('status', $resp);
         $this->assertArrayIsEqualToArrayOnlyConsideringListOfKeys([
             'title' => 'Validation Failed',
-            'status' => '400',
-            'detail' => 'currency: This value should not be blank.',
+            'status' => 400,
+            'detail' => "currency: This value should not be blank.\ncurrency: This value is too short. It should have 2 characters or more.",
         ], $resp, ['title', 'status', 'detail']);
     }
 
@@ -37,8 +40,8 @@ class RateControllerTest extends WebTestCase
     {
         static::ensureKernelShutdown();
         $client = static::createClient();
-        $this->setUpMocks($client, 0, new \DateTimeImmutable('2026-02-10'), new \DateTimeImmutable('2026-02-09'));
-        $url = '/api/v1/rate?currency=USD&date=2026-02-10';
+        $this->setUpMocks($client, 0, new \DateTimeImmutable('2026-02-10'));
+        $url = '/api/v1/rate?currency='.Currencies::USD.'&date=2026-02-10';
         $data = $this->jsonRequest($client, 'GET', $url, 202);
         $this->assertEquals('', $data['rate']);
         $this->assertEquals('', $data['diff']);
@@ -48,8 +51,8 @@ class RateControllerTest extends WebTestCase
     {
         static::ensureKernelShutdown();
         $client = static::createClient();
-        $this->setUpMocks($client, 1, new \DateTimeImmutable('2026-02-10'), new \DateTimeImmutable('2026-02-09'));
-        $url = '/api/v1/rate?currency=USD&date=2026-02-10';
+        $this->setUpMocks($client, 1, new \DateTimeImmutable('2026-01-10'));
+        $url = '/api/v1/rate?currency='.Currencies::USD.'&date=2026-01-10';
         $data = $this->jsonRequest($client, 'GET', $url, 202);
         $this->assertEquals('75.0', $data['rate']);
         $this->assertEquals('', $data['diff']);
@@ -59,16 +62,17 @@ class RateControllerTest extends WebTestCase
     {
         static::ensureKernelShutdown();
         $client = static::createClient();
-        $this->setUpMocks($client, 2, new \DateTimeImmutable('2026-02-10'), new \DateTimeImmutable('2026-02-09'));
-        $url = '/api/v1/rate?currency=USD&date=2026-02-10';
+        $this->setUpMocks($client, 2, new \DateTimeImmutable('2026-01-12'));
+        $url = '/api/v1/rate?currency='.Currencies::USD.'&date=2026-01-12';
         $data = $this->jsonRequest($client, 'GET', $url);
+
         $this->assertEquals('75.0', $data['rate']);
-        $this->assertEquals('2026-02-10', $data['date']);
-        $this->assertEquals('-3.00000000', $data['diff']);
-        $this->assertEquals('2026-02-09', $data['date_diff']);
+        $this->assertEquals('2026-01-12', $data['date']);
+        $this->assertEquals('-3', $data['diff']);
+        $this->assertEquals('2026-01-11', $data['date_diff']);
     }
 
-    private function setUpMocks(KernelBrowser $client, int $step, \DateTimeImmutable $today, \DateTimeImmutable $yesterday): void
+    private function setUpMocks(KernelBrowser $client, int $step, \DateTimeImmutable $today): void
     {
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->method('dispatch')->willReturn(new Envelope(new \stdClass()));
@@ -78,27 +82,28 @@ class RateControllerTest extends WebTestCase
         $cache->method('get')->willReturn(null);
         $client->getContainer()->set(RateCacheInterface::class, $cache);
 
-        $mockRepository = $this->createMock(ExchangeRateRepository::class);
+        $mockRepository = $this->createMock(RateRepositoryInterface::class);
 
-        $mockRepository->method('findOneByDateAndCurrency')
-            ->willReturnCallback(function (int $providerId, string $currency, string $baseCurrency, \DateTimeImmutable $date) use ($step, $today, $yesterday) {
-                $requestedDate = $date->format('Y-m-d');
-
+        $mockRepository->method('findTwoLastRates')
+            ->willReturnCallback(function (ProviderRateInterface $p, string $currency, string $baseCurrency, \DateTimeImmutable $date) use ($step, $today) {
+                $rows = [];
                 if (0 === $step) {
-                    return null;
+                    return $rows;
                 }
 
-                if (1 <= $step && $requestedDate === $today->format('Y-m-d')) {
-                    return new ExchangeRate($today, 'USD', 'RUB', '75.0', 1);
+                if (1 === $step) {
+                    $rows[] = new Rate($today, Currencies::USD, Currencies::RUB, '75.0', 1);
                 }
 
-                if (2 <= $step && $requestedDate === $yesterday->format('Y-m-d')) {
-                    return new ExchangeRate($yesterday, 'USD', 'RUB', '78.0', 1);
+                if (2 === $step) {
+                    $rows[] = new Rate($today, Currencies::USD, Currencies::RUB, '75.0', 1);
+                    $rows[] = new Rate($today->modify('-1 day'), Currencies::USD, Currencies::RUB, '78.0', 1);
                 }
 
-                return null;
+                return $rows;
             });
 
-        $client->getContainer()->set(ExchangeRateRepository::class, $mockRepository);
+        $client->getContainer()->set(RateRepositoryInterface::class, $mockRepository);
+        $client->getContainer()->set(ProviderRateRepository::class, $mockRepository);
     }
 }

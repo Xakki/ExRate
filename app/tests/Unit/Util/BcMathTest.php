@@ -27,12 +27,12 @@ class BcMathTest extends TestCase
             'round negative up' => ['-1.235', 2, '-1.24'],
             'round negative down' => ['-1.234', 2, '-1.23'],
             'round zero scale' => ['1.5', 0, '2'],
-            'round zero' => ['0', 8, '0.00000000'],
-            'round zero dot' => ['0.0', 2, '0.00'],
-            'round scientific positive' => ['2.3E-5', 8, '0.00002300'],
-            'round scientific negative' => ['-2.3E-5', 8, '-0.00002300'],
+            'round zero' => ['0', 8, '0'],
+            'round zero dot' => ['0.0', 2, '0'],
+            'round scientific positive' => ['2.3E-5', 8, '0.000023'],
+            'round scientific negative' => ['-2.3E-5', 8, '-0.000023'],
             'round scientific large' => ['1.23E2', 0, '123'],
-            'round very small' => ['1E-10', 8, '0.00000000'],
+            'round very small' => ['1E-10', 8, '0'],
             'round comma decimal' => ['1,235', 2, '1.24'],
         ];
     }
@@ -50,8 +50,8 @@ class BcMathTest extends TestCase
     {
         return [
             'div simple' => ['10', '3', 2, '3.33'],
-            'div scientific' => ['2.3E-5', '1', 8, '0.00002300'],
-            'div by small scientific' => ['1', '1E-2', 2, '100.00'],
+            'div scientific' => ['2.3E-5', '1', 8, '0.000023'],
+            'div by small scientific' => ['1', '1E-2', 2, '100'],
         ];
     }
 
@@ -67,7 +67,7 @@ class BcMathTest extends TestCase
     public static function provideSubData(): array
     {
         return [
-            'sub simple' => ['1', '0.1', 2, '0.90'],
+            'sub simple' => ['1', '0.1', 2, '0.9'],
             'sub scientific' => ['1E-1', '0.05', 2, '0.05'],
         ];
     }

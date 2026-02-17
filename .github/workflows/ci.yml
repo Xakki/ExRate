@@ -86,6 +86,10 @@ jobs:
               run: composer install --prefer-dist --no-ansi --no-progress
               timeout-minutes: 5
 
+            - name: Audit
+              run: composer audit
+              timeout-minutes: 1
+
             - name: Run PHPStan
               run: composer test:phpstan
               timeout-minutes: 1
@@ -102,12 +106,8 @@ jobs:
               run: composer test:unit
               timeout-minutes: 1
 
-            - name: Run Unit Tests
-              run: bin/phpunit --testsuite unit --log-junit report_unit.xml
-              timeout-minutes: 1
-
             - name: Run Functional Tests
-              run: bin/phpunit --testsuite functional --log-junit report_functional.xml
+              run: composer test:functional
               timeout-minutes: 1
 
             - name: Upload test results

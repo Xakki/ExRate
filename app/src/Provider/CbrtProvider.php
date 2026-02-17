@@ -4,22 +4,27 @@ declare(strict_types=1);
 
 namespace App\Provider;
 
-use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
+use App\DTO\RateData;
 use App\Enum\ProviderEnum;
+use App\Exception\FailedProviderException;
+use App\Service\AbstractProviderRate;
 use App\Util\BcMath;
+use App\Util\Currencies;
+use App\Util\Date;
+use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * @see https://www.tcmb.gov.tr/wps/wcm/connect/EN/TCMB+EN
  */
-final readonly class CbrtProvider implements ProviderInterface
+final readonly class CbrtProvider extends AbstractProviderRate
 {
-    public const string BASE_URL = 'https://www.tcmb.gov.tr/kurlar/';
-
     public function __construct(
-        private HttpClientInterface $httpClient,
-        private int $id,
+        protected HttpClientInterface $httpClient,
+        protected LoggerInterface $logger,
+        protected int $id,
+        private string $url,
         private int $currencyPrecision,
     ) {
     }
@@ -29,11 +34,6 @@ final readonly class CbrtProvider implements ProviderInterface
         return 'provider.cbrt';
     }
 
-    public function getId(): int
-    {
-        return $this->id;
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::CBRT;
@@ -41,7 +41,7 @@ final readonly class CbrtProvider implements ProviderInterface
 
     public function getBaseCurrency(): string
     {
-        return 'TRY';
+        return Currencies::TRY;
     }
 
     public function getHomePage(): string
@@ -54,7 +54,7 @@ final readonly class CbrtProvider implements ProviderInterface
         return 'Central Bank of the Republic of Turkey';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
     {
         return $this->getRatesTry($date);
     }
@@ -63,12 +63,12 @@ final readonly class CbrtProvider implements ProviderInterface
     {
         $url = $this->buildUrl($date);
 
-        $response = $this->httpClient->request('GET', $url);
+        $response = $this->request($url);
 
         // CBRT returns 404 if no rates for the day (e.g. weekend)
         if (404 === $response->getStatusCode()) {
             if ($try > 10) {
-                return new GetRatesResult($this->getId(), $this->getBaseCurrency(), $date, []);
+                return new GetRatesResult($this, $this->getBaseCurrency(), $date, []);
             }
             // Try previous day
             $prevDate = $date->modify('-1 day');
@@ -78,11 +78,10 @@ final readonly class CbrtProvider implements ProviderInterface
             return $this->getRatesTry($prevDate, ++$try);
         }
 
-        $content = $response->getContent();
-        $xml = simplexml_load_string($content);
+        $xml = simplexml_load_string($response->getContent(false));
 
         if (false === $xml) {
-            throw new \RuntimeException('Failed to parse CBRT XML response');
+            throw new FailedProviderException('Failed to parse CBRT XML response');
         }
 
         $responseDate = new \DateTimeImmutable((string) $xml['Date']);
@@ -94,48 +93,37 @@ final readonly class CbrtProvider implements ProviderInterface
             $unit = (string) ($currency->Unit ?? '1');
 
             if ($value) {
-                $rates[$code] = BcMath::div($value, $unit, $this->currencyPrecision);
+                $rates[$code] = new RateData(BcMath::div($value, $unit, $this->currencyPrecision));
             }
         }
 
-        return new GetRatesResult($this->getId(), $this->getBaseCurrency(), $responseDate, $rates);
-    }
-
-    public function isActive(): bool
-    {
-        return true;
+        return new GetRatesResult($this, $this->getBaseCurrency(), $responseDate, $rates);
     }
 
     public function getAvailableCurrencies(): array
     {
-        return ['AED', 'AUD', 'AZN', 'CAD', 'CHF', 'CNY', 'DKK', 'EUR', 'GBP', 'JPY', 'KRW', 'KWD', 'KZT', 'NOK', 'PKR', 'QAR', 'RON', 'RUB', 'SAR', 'SEK', 'USD'];
+        return [Currencies::AED, Currencies::AUD, Currencies::AZN, Currencies::CAD, Currencies::CHF, Currencies::CNY, Currencies::DKK, Currencies::EUR, Currencies::GBP, Currencies::JPY, Currencies::KRW, Currencies::KWD, Currencies::KZT, Currencies::NOK, Currencies::PKR, Currencies::QAR, Currencies::RON, Currencies::RUB, Currencies::SAR, Currencies::SEK, Currencies::USD];
     }
 
     private function buildUrl(\DateTimeImmutable $date): string
     {
-        $now = new \DateTimeImmutable();
-        if ($date->format('Y-m-d') === $now->format('Y-m-d')) {
-            return self::BASE_URL.'today.xml';
+        $baseUrl = rtrim($this->url, '/').'/';
+
+        if (0 === Date::getDayDiff($date)) {
+            return $baseUrl.'today.xml';
         }
 
         $yearMonth = $date->format('Ym');
         $dayMonthYear = $date->format('dmY');
 
-        return self::BASE_URL.$yearMonth.'/'.$dayMonthYear.'.xml';
+        return $baseUrl.$yearMonth.'/'.$dayMonthYear.'.xml';
     }
 
-    public function getRequestLimit(): int
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
     {
-        return 0;
-    }
-
-    public function getRequestLimitPeriod(): int
-    {
-        return 0;
-    }
-
-    public function getRequestDelay(): int
-    {
-        return 2;
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

@@ -4,22 +4,26 @@ declare(strict_types=1);
 
 namespace App\Provider;
 
-use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
+use App\DTO\RateData;
 use App\Enum\ProviderEnum;
+use App\Service\AbstractProviderRate;
 use App\Util\BcMath;
+use App\Util\Currencies;
+use App\Util\Date;
+use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * @see https://www.cnb.cz/en/financial-markets/foreign-exchange-market/central-bank-exchange-rate-fixing/central-bank-exchange-rate-fixing/
  */
-final readonly class CnbProvider implements ProviderInterface
+final readonly class CnbProvider extends AbstractProviderRate
 {
-    public const URL = 'https://www.cnb.cz/cs/financni-trhy/devizovy-trh/kurzy-devizoveho-trhu/kurzy-devizoveho-trhu/denni_kurz.txt';
-
     public function __construct(
-        private HttpClientInterface $httpClient,
-        private int $id,
+        protected HttpClientInterface $httpClient,
+        protected LoggerInterface $logger,
+        protected int $id,
+        private string $url,
         private int $currencyPrecision,
     ) {
     }
@@ -29,11 +33,6 @@ final readonly class CnbProvider implements ProviderInterface
         return 'provider.cnb';
     }
 
-    public function getId(): int
-    {
-        return $this->id;
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::CNB;
@@ -41,7 +40,7 @@ final readonly class CnbProvider implements ProviderInterface
 
     public function getBaseCurrency(): string
     {
-        return 'CZK';
+        return Currencies::CZK;
     }
 
     public function getHomePage(): string
@@ -54,22 +53,25 @@ final readonly class CnbProvider implements ProviderInterface
         return 'Czech National Bank';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
     {
-        $response = $this->httpClient->request('GET', self::URL, [
+        $response = $this->request($this->url, options: [
             'query' => [
                 'date' => $date->format('d.m.Y'),
             ],
         ]);
-
         $content = $response->getContent();
-        $lines = explode('
-', $content);
+        $lines = explode(PHP_EOL, $content);
 
         // First line: 20.02.2025 #36
         $firstLine = $lines[0];
         $dateParts = explode(' ', $firstLine);
-        $responseDate = \DateTimeImmutable::createFromFormat('d.m.Y', $dateParts[0]) ?: $date;
+        try {
+            $responseDate = Date::createFromFormat('d.m.Y', $dateParts[0]);
+        } catch (\App\Exception\BadDateException) {
+            // TODO: log notice
+            $responseDate = $date;
+        }
 
         $rates = [];
         // Skip first two lines (header)
@@ -89,34 +91,22 @@ final readonly class CnbProvider implements ProviderInterface
             $code = $parts[3];
             $rate = $parts[4];
 
-            $rates[$code] = BcMath::div($rate, $amount, $this->currencyPrecision);
+            $rates[$code] = new RateData(BcMath::div($rate, $amount, $this->currencyPrecision));
         }
 
-        return new GetRatesResult($this->getId(), $this->getBaseCurrency(), $responseDate, $rates);
-    }
-
-    public function isActive(): bool
-    {
-        return true;
+        return new GetRatesResult($this, $this->getBaseCurrency(), $responseDate, $rates);
     }
 
     public function getAvailableCurrencies(): array
     {
-        return ['AUD', 'BRL', 'CAD', 'CHF', 'CNY', 'DKK', 'EUR', 'GBP', 'HKD', 'HUF', 'IDR', 'ILS', 'INR', 'ISK', 'JPY', 'KRW', 'MXN', 'MYR', 'NOK', 'NZD', 'PHP', 'PLN', 'RON', 'SEK', 'SGD', 'THB', 'TRY', 'USD', 'XDR', 'ZAR'];
+        return [Currencies::AUD, Currencies::BRL, Currencies::CAD, Currencies::CHF, Currencies::CNY, Currencies::DKK, Currencies::EUR, Currencies::GBP, Currencies::HKD, Currencies::HUF, Currencies::IDR, Currencies::ILS, Currencies::INR, Currencies::ISK, Currencies::JPY, Currencies::KRW, Currencies::MXN, Currencies::MYR, Currencies::NOK, Currencies::NZD, Currencies::PHP, Currencies::PLN, Currencies::RON, Currencies::SEK, Currencies::SGD, Currencies::THB, Currencies::TRY, Currencies::USD, Currencies::XDR, Currencies::ZAR];
     }
 
-    public function getRequestLimit(): int
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
     {
-        return 0;
-    }
-
-    public function getRequestLimitPeriod(): int
-    {
-        return 0;
-    }
-
-    public function getRequestDelay(): int
-    {
-        return 2;
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

@@ -1,9 +1,9 @@
 parameters:
     fetch_rate_interval: '%env(int:FETCH_RATE_INTERVAL)%'
     currency_precision: '%env(int:CURRENCY_PRECISION)%'
-    default_log_stream: 'php://stderr'
+    default_log_stream: "%kernel.logs_dir%/%kernel.environment%.log"
+    #default_log_stream: 'php://stderr'
     monolog.handlers.file_log.path: "%kernel.logs_dir%/%kernel.environment%_errors.log"
-    #default_log_stream: "%kernel.logs_dir%/%kernel.environment%.log"
 
 services:
     _defaults:
@@ -13,7 +13,7 @@ services:
             $currencyPrecision: '%currency_precision%'
 
     _instanceof:
-        App\Contract\ProviderInterface:
+        App\Contract\ProviderRateInterface:
             tags: ['app.provider']
 
     test.service_container:
@@ -26,11 +26,23 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
 
-    App\Repository\ExchangeRateRepository:
+    App\Repository\RateRepository:
+        public: true
+
+    App\Repository\RateExtendRepository:
+        public: true
+
+    App\Repository\ProviderRateRepository:
+        public: true
+
+    App\Contract\RateRepositoryInterface:
+        alias: 'App\Repository\ProviderRateRepository'
         public: true
 
     App\Service\ProviderRegistry:
         public: true
+        arguments:
+            $exchangeRateRepository: '@App\Contract\RateRepositoryInterface'
 
     # Cache configs
 
@@ -46,17 +58,12 @@ services:
             - { name: 'cache.pool', namespace: '%env(APP_ENV)%' }
 
     App\Contract\Cache\RateCacheInterface: '@App\Cache\RateCache'
-    App\Contract\Cache\SkipDayCacheInterface: '@App\Cache\SkipDayCache'
     App\Contract\Cache\TimeseriesCacheInterface: '@App\Cache\TimeseriesCache'
     App\Contract\Cache\RateLimitCacheInterface: '@App\Cache\RateLimitCache'
 
     App\Cache\RateCache:
         arguments:
             $cacheItemPool: '@first_cache'
-
-    App\Cache\SkipDayCache:
-        arguments:
-            $cacheItemPool: '@second_cache'
 
     App\Cache\TimeseriesCache:
         arguments:
@@ -68,179 +75,237 @@ services:
 
 
     # Providers
-    App\Provider\CbrProvider:
-        arguments:
-            $id: 1
-            $url: 'https://cbr.ru/scripts/XML_daily.asp'
-            $currencyPrecision: 8
-        tags:
-            - { name: 'app.provider', key: 'provider.cbr' }
 
-    App\Provider\EcbProvider:
+    App\Provider\AbstractApiProvider:
         arguments:
-            $id: 2
-            $currencyPrecision: 8
+            $id: 24
+            $url: 'https://exchange-rates.abstractapi.com/v1/live/?api_key={apiKey}&base={baseCurrency}'
+            $apiKey: '%env(ABSTRACT_API_KEY)%'
         tags:
-            - { name: 'app.provider', key: 'provider.ecb' }
-
-    App\Provider\NbrProvider:
-        arguments:
-            $id: 3
-            $currencyPrecision: 8
-        tags:
-            - { name: 'app.provider', key: 'provider.nbr' }
-
-    App\Provider\CbrtProvider:
-        arguments:
-            $id: 4
-            $currencyPrecision: 8
-        tags:
-            - { name: 'app.provider', key: 'provider.cbrt' }
-
-    App\Provider\CnbProvider:
-        arguments:
-            $id: 5
-            $currencyPrecision: 8
-        tags:
-            - { name: 'app.provider', key: 'provider.cnb' }
-
-    App\Provider\RcbProvider:
-        arguments:
-            $id: 6
-            $currencyPrecision: 8
-        tags:
-            - { name: 'app.provider', key: 'provider.rcb' }
-
-    App\Provider\BnbProvider:
-        arguments:
-            $id: 7
-            $currencyPrecision: 8
-        tags:
-            - { name: 'app.provider', key: 'provider.bnb' }
-
-    App\Provider\NbuProvider:
-        arguments:
-            $id: 8
-            $currencyPrecision: 8
-        tags:
-            - { name: 'app.provider', key: 'provider.nbu' }
-
-    App\Provider\NbgProvider:
-        arguments:
-            $id: 9
-            $currencyPrecision: 8
-        tags:
-            - { name: 'app.provider', key: 'provider.nbg' }
-
-    App\Provider\OpenExchangeRatesProvider:
-        arguments:
-            $id: 10
-            $appId: '%env(OPEN_EXCHANGE_RATES_APP_ID)%'
-            $currencyPrecision: 8
-        tags:
-            - { name: 'app.provider', key: 'provider.open_exchange_rates' }
-
-    App\Provider\CurrencyLayerProvider:
-        arguments:
-            $id: 12
-            $accessKey: '%env(CURRENCY_LAYER_ACCESS_KEY)%'
-            $currencyPrecision: 8
-        tags:
-            - { name: 'app.provider', key: 'provider.currency_layer' }
-
-    App\Provider\CoinLayerProvider:
-        arguments:
-            $id: 13
-            $accessKey: '%env(COIN_LAYER_ACCESS_KEY)%'
-            $currencyPrecision: 8
-        tags:
-            - { name: 'app.provider', key: 'provider.coin_layer' }
-
-    App\Provider\ApiLayerFixerProvider:
-        arguments:
-            $id: 14
-            $apiKey: '%env(API_LAYER_FIXER_API_KEY)%'
-            $currencyPrecision: 8
-        tags:
-            - { name: 'app.provider', key: 'provider.api_layer_fixer' }
+            - { name: 'app.provider', key: 'provider.abstract_api' }
 
     App\Provider\ApiLayerCurrencyDataProvider:
         arguments:
             $id: 15
+            $url: 'https://api.apilayer.com/currency_data/historical?date={date:Y-m-d}&source={baseCurrency}'
             $apiKey: '%env(API_LAYER_CURRENCY_DATA_API_KEY)%'
-            $currencyPrecision: 8
         tags:
             - { name: 'app.provider', key: 'provider.api_layer_currency_data' }
 
     App\Provider\ApiLayerExchangeRatesDataProvider:
         arguments:
             $id: 16
+            $url: 'https://api.apilayer.com/exchangerates_data/{date:Y-m-d}?base={baseCurrency}'
             $apiKey: '%env(API_LAYER_EXCHANGE_RATES_DATA_API_KEY)%'
-            $currencyPrecision: 8
         tags:
             - { name: 'app.provider', key: 'provider.api_layer_exchange_rates_data' }
+
+    App\Provider\ApiLayerFixerProvider:
+        arguments:
+            $id: 14
+            $url: 'https://api.apilayer.com/fixer/{date:Y-m-d}?base={baseCurrency}'
+            $apiKey: '%env(API_LAYER_FIXER_API_KEY)%'
+        tags:
+            - { name: 'app.provider', key: 'provider.api_layer_fixer' }
+
+    App\Provider\BankOfCanadaProvider:
+        arguments:
+            $id: 26
+            $url: 'https://www.bankofcanada.ca/valet/observations/group/FX_RATES_DAILY/json?start_date={dateStart:Y-m-d}&end_date={date:Y-m-d}'
+            $periodDays: 60
+        tags:
+            - { name: 'app.provider', key: 'provider.bank_of_canada' }
+
+    App\Provider\BanxicoProvider:
+        arguments:
+            $id: 30
+            $url: 'https://www.banxico.org.mx/SieAPIRest/service/v1/series/{currencies}/datos/{dateStart:Y-m-d}/{date:Y-m-d}'
+            $apiKey: '%env(BANXICO_TOKEN)%'
+            $periodDays: 60
+        tags:
+            - { name: 'app.provider', key: 'provider.banxico' }
+
+    App\Provider\BcbProvider:
+        arguments:
+            $id: 31
+            $url: 'https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata'
+            $pathRange: '/CotacaoMoedaPeriodo(moeda=@moeda,dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)?@moeda={currencies}&@dataInicial={dateStart:m-d-Y}&@dataFinalCotacao={date:m-d-Y}&$format=json'
+        tags:
+            - { name: 'app.provider', key: 'provider.bcb' }
+
+    App\Provider\BinanceProvider:
+        arguments:
+            $id: 27
+            $url: 'https://api.binance.com'
+            $periodDays: 60
+            $currencyPrecision: 10
+        tags:
+            - { name: 'app.provider', key: 'provider.binance' }
+
+    App\Provider\BnbProvider:
+        arguments:
+            $id: 7
+            $url: 'https://www.bnb.bg/Statistics/StExternalSector/StExchangeRates/StERForeignCurrencies/index.htm'
+        tags:
+            - { name: 'app.provider', key: 'provider.bnb' }
+
+    App\Provider\CbrProvider:
+        arguments:
+            $id: 1
+            $url: 'https://cbr.ru/scripts/XML_daily.asp?date_req={date:d/m/Y}'
+        tags:
+            - { name: 'app.provider', key: 'provider.cbr' }
+
+    App\Provider\CbrtProvider:
+        arguments:
+            $id: 4
+            $url: 'https://www.tcmb.gov.tr/kurlar/'
+        tags:
+            - { name: 'app.provider', key: 'provider.cbrt' }
+
+    App\Provider\CnbProvider:
+        arguments:
+            $id: 5
+            $url: 'https://www.cnb.cz/cs/financni-trhy/devizovy-trh/kurzy-devizoveho-trhu/kurzy-devizoveho-trhu/denni_kurz.txt'
+        tags:
+            - { name: 'app.provider', key: 'provider.cnb' }
+
+    App\Provider\CoinLayerProvider:
+        arguments:
+            $id: 13
+            $url: 'http://api.coinlayer.com/api'
+            $apiKey: '%env(COIN_LAYER_ACCESS_KEY)%'
+        tags:
+            - { name: 'app.provider', key: 'provider.coin_layer' }
+
+    App\Provider\CurrencyConverterProvider:
+        arguments:
+            $id: 23
+            $url: 'https://free.currconv.com/api/v7/convert'
+            $apiKey: '%env(CURRENCY_CONVERTER_API_KEY)%'
+        tags:
+            - { name: 'app.provider', key: 'provider.currency_converter' }
+
+    App\Provider\CurrencyDataFeedProvider:
+        arguments:
+            $id: 22
+            $url: 'https://currencydatafeed.com/api/data.php'
+            $apiKey: '%env(CURRENCY_DATA_FEED_TOKEN)%'
+        tags:
+            - { name: 'app.provider', key: 'provider.currency_data_feed' }
+
+    App\Provider\CurrencyLayerProvider:
+        arguments:
+            $id: 12
+            $url: 'http://apilayer.net/api'
+            $apiKey: '%env(CURRENCY_LAYER_ACCESS_KEY)%'
+        tags:
+            - { name: 'app.provider', key: 'provider.currency_layer' }
+
+    App\Provider\EcbProvider:
+        arguments:
+            $id: 2
+            $url: 'https://www.ecb.europa.eu/stats/eurofxref'
+            $periodDays: 60
+        tags:
+            - { name: 'app.provider', key: 'provider.ecb' }
 
     App\Provider\ExchangeRatesApiProvider:
         arguments:
             $id: 17
-            $accessKey: '%env(EXCHANGE_RATES_API_ACCESS_KEY)%'
-            $currencyPrecision: 8
+            $url: 'http://api.exchangeratesapi.io/v1'
+            $apiKey: '%env(EXCHANGE_RATES_API_ACCESS_KEY)%'
         tags:
             - { name: 'app.provider', key: 'provider.exchange_rates_api' }
 
     App\Provider\FastForexProvider:
         arguments:
             $id: 18
+            $url: 'https://api.fastforex.io'
             $apiKey: '%env(FASTFOREX_API_KEY)%'
-            $currencyPrecision: 8
         tags:
             - { name: 'app.provider', key: 'provider.fast_forex' }
 
     App\Provider\ForgeProvider:
         arguments:
             $id: 19
+            $url: 'https://api.1forge.com'
             $apiKey: '%env(FORGE_API_KEY)%'
-            $currencyPrecision: 8
         tags:
             - { name: 'app.provider', key: 'provider.forge' }
+
+    App\Provider\FrankfurterProvider:
+        arguments:
+            $id: 25
+            $url: 'https://api.frankfurter.app'
+            $periodDays: 60
+        tags:
+            - { name: 'app.provider', key: 'provider.frankfurter' }
+
+    App\Provider\FredProvider:
+        arguments:
+            $id: 28
+            $url: 'https://api.stlouisfed.org/fred'
+            $apiKey: '%env(FRED_API_KEY)%'
+            $periodDays: 90
+        tags:
+            - { name: 'app.provider', key: 'provider.fred' }
+
+    App\Provider\MoexProvider:
+        arguments:
+            $id: 29
+            $url: 'https://iss.moex.com/iss'
+        tags:
+            - { name: 'app.provider', key: 'provider.moex' }
+
+    App\Provider\NbgProvider:
+        arguments:
+            $id: 9
+            $url: 'https://nbg.gov.ge/gw/api/ct/monetarypolicy/currencies/en/json?date={date:Y-m-d}'
+        tags:
+            - { name: 'app.provider', key: 'provider.nbg' }
+
+    App\Provider\NbrProvider:
+        arguments:
+            $id: 3
+            $url: 'https://curs.bnr.ro'
+        tags:
+            - { name: 'app.provider', key: 'provider.nbr' }
+
+    App\Provider\NbuProvider:
+        arguments:
+            $id: 8
+            $url: 'https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?date={date:Ymd}'
+        tags:
+            - { name: 'app.provider', key: 'provider.nbu' }
+
+    App\Provider\OpenExchangeRatesProvider:
+        arguments:
+            $id: 10
+            $url: 'https://openexchangerates.org/api/historical/{date:Y-m-d}.json?show_alternative=1&app_id={apiKey}'
+            $apiKey: '%env(OPEN_EXCHANGE_RATES_APP_ID)%'
+        tags:
+            - { name: 'app.provider', key: 'provider.open_exchange_rates' }
+
+    App\Provider\RcbProvider:
+        arguments:
+            $id: 6
+            $url: 'https://cbu.uz/common/json/?date={date:d.m.Y}'
+        tags:
+            - { name: 'app.provider', key: 'provider.rcb' }
 
     App\Provider\XchangeApiProvider:
         arguments:
             $id: 20
+            $url: 'https://api.xchangeapi.com/latest?base={baseCurrency}&api-key={apiKey}'
             $apiKey: '%env(XCHANGE_API_KEY)%'
-            $currencyPrecision: 8
         tags:
             - { name: 'app.provider', key: 'provider.xchange_api' }
 
     App\Provider\XigniteProvider:
         arguments:
             $id: 21
-            $token: '%env(XIGNITE_TOKEN)%'
-            $currencyPrecision: 8
+            $url: 'https://globalcurrencies.xignite.com/xGlobalCurrencies.json'
+            $apiKey: '%env(XIGNITE_TOKEN)%'
         tags:
             - { name: 'app.provider', key: 'provider.xignite' }
-
-    App\Provider\CurrencyDataFeedProvider:
-        arguments:
-            $id: 22
-            $token: '%env(CURRENCY_DATA_FEED_TOKEN)%'
-            $currencyPrecision: 8
-        tags:
-            - { name: 'app.provider', key: 'provider.currency_data_feed' }
-
-    App\Provider\CurrencyConverterProvider:
-        arguments:
-            $id: 23
-            $apiKey: '%env(CURRENCY_CONVERTER_API_KEY)%'
-            $currencyPrecision: 8
-        tags:
-            - { name: 'app.provider', key: 'provider.currency_converter' }
-
-    App\Provider\AbstractApiProvider:
-        arguments:
-            $id: 24
-            $apiKey: '%env(ABSTRACT_API_KEY)%'
-            $currencyPrecision: 8
-        tags:
-            - { name: 'app.provider', key: 'provider.abstract_api' }
-

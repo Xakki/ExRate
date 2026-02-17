@@ -6,11 +6,6 @@ monolog:
             type: stream
             path: "%monolog.handlers.file_log.path%"
             level: notice
-        console:
-            type:   console
-            process_psr_3_messages: false
-            channels: ['!event', '!doctrine', '!console']
-            interactive_only: true
 
 when@dev:
     monolog:
@@ -21,11 +16,12 @@ when@dev:
                 #path: php://stderr
                 #path: "%kernel.logs_dir%/%kernel.environment%.log"
                 level: debug
-                channels: ["!event"]
+                channels: ['!event', '!doctrine', '!console']
             console:
                 type: console
                 process_psr_3_messages: false
                 channels: ["!event", "!doctrine", "!console"]
+                level: info
 
 when@test:
     monolog:
@@ -35,12 +31,18 @@ when@test:
                 action_level: error
                 handler: nested
                 channels: ["!event"]
+                level: info
             nested:
                 type: stream
                 path: "%env(default:default_log_stream:MONOLOG_LOG_STREAM)%"
                 #path: php://stderr
                 #path: "%kernel.logs_dir%/%kernel.environment%.log"
                 level: info
+            console:
+                type: console
+                process_psr_3_messages: false
+                channels: ["!event", "!doctrine", "!console"]
+                level: notice
 
 when@prod:
     monolog:
@@ -49,6 +51,7 @@ when@prod:
                 type: fingers_crossed
                 action_level: error
                 handler: nested
+                level: notice
                 excluded_http_codes: [404, 405]
                 channels: ["!deprecation"]
                 buffer_size: 50 # How many messages should be saved? Prevent memory leaks
@@ -62,6 +65,7 @@ when@prod:
                 type: console
                 process_psr_3_messages: false
                 channels: ["!event", "!doctrine"]
+                level: notice
             deprecation:
                 type: stream
                 channels: [deprecation]

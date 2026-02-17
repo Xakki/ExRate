@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Cache;
 
 use App\Contract\Cache\RateCacheInterface;
-use App\DTO\RateResponse;
 use App\Enum\ProviderEnum;
+use App\Response\RateResponse;
+use App\Util\Date;
 use Psr\Cache\CacheItemPoolInterface;
 
 final readonly class RateCache implements RateCacheInterface
@@ -19,7 +20,7 @@ final readonly class RateCache implements RateCacheInterface
 
     public function get(\DateTimeImmutable $date, ProviderEnum $providerEnum, string $baseCurrency, string $currency): ?RateResponse
     {
-        $key = sprintf(self::CACHE_KEY, $providerEnum->value, $date->format('Y-m-d'), $baseCurrency, $currency);
+        $key = sprintf(self::CACHE_KEY, $providerEnum->value, $date->format(Date::FORMAT), $baseCurrency, $currency);
 
         $item = $this->cacheItemPool->getItem($key);
 
@@ -32,7 +33,7 @@ final readonly class RateCache implements RateCacheInterface
 
     public function set(\DateTimeImmutable $date, ProviderEnum $providerEnum, string $baseCurrency, string $currency, RateResponse $rateResponse): void
     {
-        $key = sprintf(self::CACHE_KEY, $providerEnum->value, $date->format('Y-m-d'), $baseCurrency, $currency);
+        $key = sprintf(self::CACHE_KEY, $providerEnum->value, $date->format(Date::FORMAT), $baseCurrency, $currency);
 
         $item = $this->cacheItemPool->getItem($key);
         $item->set($rateResponse);

@@ -18,18 +18,23 @@
 
         <section class="controls-main">
             <div class="control-group">
-                <label for="provider_select">Provider</label>
+                <label>Grouping Mode</label>
+                <div class="grouping-toggle">
+                    <input type="radio" id="group_by_provider" name="grouping_mode" value="provider" checked>
+                    <label for="group_by_provider">By Provider</label>
+                    <input type="radio" id="group_by_pair" name="grouping_mode" value="pair">
+                    <label for="group_by_pair">By Currency Pair</label>
+                </div>
+            </div>
+            <div class="control-group" id="provider_select_group">
+                <label for="provider_select" id="provider_select_label">Provider</label>
                 <select id="provider_select" name="provider_select"></select>
             </div>
             <div class="control-group">
-                <label for="base_currency">Global Base Currency</label>
-                <select id="base_currency" name="base_currency"></select>
-            </div>
-            <div class="control-group">
-                <label>Add Currency</label>
+                <label id="add_item_label">Currency</label>
                 <div class="add-pair-controls">
-                    <select id="currency" name="currency"></select>
-                    <button id="add-pair-btn" title="Add currency pair">+</button>
+                    <select id="currency" name="currency"></select> / <select id="base_currency" name="base_currency"></select>
+                    <button id="add-pair-btn" title="Add item">+</button>
                 </div>
             </div>
         </section>
@@ -77,13 +82,17 @@ $currency = 'USD';
 $baseCurrency = 'EUR';
 
 $url = sprintf(
-    'https://exrate.xakki.pro/api/v1/rate?date=%s&currency=%s&baseCurrency=%s',
+    'https://exrate.xakki.pro/api/v1/rate?date=%s&currency=%s&base_currency=%s',
     $date->format('Y-m-d'),
     $currency,
     $baseCurrency
 );
 
-$response = $client->request('GET', $url);
+$response = $client->request('GET', $url, [
+    'headers' => [
+        'Accept' => 'application/json',
+    ]
+]);
 
 if ($response->getStatusCode() === 200) {
     $data = $response->toArray();
@@ -102,9 +111,9 @@ date = datetime.now().strftime('%Y-%m-%d')
 currency = 'USD'
 base_currency = 'EUR'
 
-url = f'https://exrate.xakki.pro/api/v1/rate?date={date}&currency={currency}&baseCurrency={base_currency}'
+url = f'https://exrate.xakki.pro/api/v1/rate?date={date}&currency={currency}&base_currency={base_currency}'
 
-response = requests.get(url)
+response = requests.get(url, headers={'Accept': 'application/json'})
 
 if response.status_code == 200:
     data = response.json()
@@ -121,9 +130,11 @@ const date = new Date().toISOString().slice(0, 10);
 const currency = 'USD';
 const baseCurrency = 'EUR';
 
-const url = `https://exrate.xakki.pro/api/v1/rate?date=${date}&currency=${currency}&baseCurrency=${baseCurrency}`;
+const url = `https://exrate.xakki.pro/api/v1/rate?date=${date}&currency=${currency}&base_currency=${baseCurrency}`;
 
-fetch(url)
+fetch(url, {
+    headers: { 'Accept': 'application/json' }
+})
     .then(res => {
         if (res.status === 200) {
             return res.json();
@@ -155,9 +166,13 @@ func main() {
 	currency := "USD"
 	baseCurrency := "EUR"
 
-	url := fmt.Sprintf("https://exrate.xakki.pro/api/v1/rate?date=%s&currency=%s&baseCurrency=%s", date, currency, baseCurrency)
+	url := fmt.Sprintf("https://exrate.xakki.pro/api/v1/rate?date=%s&currency=%s&base_currency=%s", date, currency, baseCurrency)
 
-	resp, err := http.Get(url)
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Add("Accept", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
 		// handle error
 	}
@@ -180,6 +195,7 @@ func main() {
             </div>
         </section>
     </div>
+    <div id="notification-container"></div>
 {% endblock %}
 
 {% block javascripts %}

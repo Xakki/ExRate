@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
-use App\DTO\RateRequest;
-use App\DTO\RateResponse;
-use App\DTO\TimeseriesRequest;
-use App\DTO\TimeseriesResponse;
 use App\Exception\DisabledProviderException;
 use App\Exception\RateNotFoundException;
+use App\Request\RateRequest;
+use App\Request\TimeseriesRequest;
+use App\Response\RateResponse;
+use App\Response\TimeseriesResponse;
 use App\Service\ProviderManager;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -87,7 +87,7 @@ class RateController extends AbstractController
                 $request->provider
             );
             $headers = [];
-            if (null === $response->diff) {
+            if (!$response->isFullData()) {
                 $status = 202;
                 $headers = $headerRetry;
             }
@@ -95,7 +95,7 @@ class RateController extends AbstractController
             return $this->json($response, $status, $headers);
         } catch (RateNotFoundException) {
             return $this->json(
-                new RateResponse('', null, '', null),
+                new RateResponse('', '', null, null),
                 202,
                 $headerRetry
             );
@@ -140,7 +140,8 @@ class RateController extends AbstractController
             $request->getEndDateImmutable(),
             $request->currency,
             $request->baseCurrency,
-            $request->provider
+            $request->provider,
+            $request->group,
         );
 
         return $this->json($response);

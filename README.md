@@ -1,4 +1,4 @@
-# CBR Exchange Rate Service
+# Exchange Rate Service (supporting 30+ providers)
 
 https://exrate.xakki.pro
 
@@ -6,13 +6,35 @@ A Symfony 8 / PHP 8.5 application to fetch and cache exchange rates
 
 ## Features
 
-- **Real-time Rates**: Fetch current exchange rates (from many provider).
-- **Historical Data**: Calculate difference with the previous trading day.
+- **Historical Data**: With calculate difference with the previous trading day.
 - **Cross-Rates**: Calculate rates between any two currencies
 - **Caching**: High-performance caching using KeyDB (Redis compatible).
 - **Resilience**: Fallback to local database if external API is unreachable.
 - **API Documentation**: Auto-generated OpenAPI (Swagger) documentation.
 - **AI Agent Ready**: AGENTS.md
+
+## Supported Providers (31)
+
+- **CBR** — Central Bank of Russia (Base: RUB)
+- **ECB** — European Central Bank (Base: EUR)
+- **MOEX** — Moscow Exchange (Stocks, OHLC data)
+- **FRED** — Federal Reserve Economic Data
+- **Binance** — Crypto rates
+- **Open Exchange Rates**
+- **Fixer.io** (via APILayer)
+- **Exchange Rates API**
+- **Currencylayer**
+- **Coinlayer** (Crypto)
+- **Bank of Canada**
+- **Banxico** — Bank of Mexico
+- **BCB** — Central Bank of Brazil
+- **NBR** — National Bank of Romania
+- **CBRT** — Central Bank of Turkey
+- **CNB** — Czech National Bank
+- **RCB** — Central Bank of Uzbekistan
+- **NBU** — National Bank of Ukraine
+- **NBG** — National Bank of Georgia
+- **Abstract API**, **FastForex**, **1forge**, **XchangeAPI**, **Xignite**, **CurrencyDataFeed**, **CurrencyConverter**, **Frankfurter**
 
 ## Requirements
 
@@ -64,8 +86,8 @@ Returns the rate for a specific currency and the difference from the previous tr
 **Parameters:**
 - `currency` (required): ISO code (e.g., USD).
 - `date` (optional): `Y-m-d` (default: today).
-- `base_currency` (optional): Default `RUB`.
-- `provider` (optional): Default `cbr`.
+- `base_currency` (optional): Default `EUR`.
+- `provider` (optional): Default `ecb`.
 
 **Example Request:**
 ```bash
@@ -75,10 +97,10 @@ curl "http://localhost/api/v1/rate?date=2026-02-09&currency=USD"
 **Example Response:**
 ```json
 {
-    "rate":"77.05400000",
-    "diff":"0.5017",
+    "rate":"1.03450000",
+    "diff":"-0.0012",
     "dateDiff":"2026-02-06",
-    "date":"2026-02-07",
+    "date":"2026-02-09",
     "timestamp":"2026-02-09T21:51:29+03:00"
 }
 ```
@@ -109,4 +131,4 @@ make cs-fix
 
 ## Architecture
 
-see [ARCHITECTURE.md](ARCHITECTURE.md).
+see [ARCHITECTURE.md](.ai/ARCHITECTURE.md).

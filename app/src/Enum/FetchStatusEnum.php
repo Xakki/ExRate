@@ -7,6 +7,6 @@ namespace App\Enum;
 enum FetchStatusEnum: string
 {
     case ALREADY_EXIST = 'exist';
-    case NO_MORE = 'no_more';
+    case EMPTY = 'empty';
     case SUCCESS = 'success';
 }

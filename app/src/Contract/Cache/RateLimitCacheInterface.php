@@ -13,4 +13,8 @@ interface RateLimitCacheInterface
     public function increment(ProviderEnum $providerEnum, int $period): int;
 
     public function clear(ProviderEnum $providerEnum): void;
+
+    public function block(ProviderEnum $providerEnum, int $seconds): void;
+
+    public function getBlockedUntil(ProviderEnum $providerEnum): ?int;
 }

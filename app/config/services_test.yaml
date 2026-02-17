@@ -9,4 +9,3 @@ services:
         public: true
     Symfony\Component\Messenger\MessageBusInterface: '@messenger.bus.default'
     App\Contract\Cache\RateCacheInterface: '@App\Cache\RateCache'
-    App\Contract\Cache\SkipDayCacheInterface: '@App\Cache\SkipDayCache'

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional;
 
-use App\Entity\ExchangeRate;
 use App\Tests\WebTestCase;
 
 class ProviderControllerTest extends WebTestCase
@@ -12,7 +11,6 @@ class ProviderControllerTest extends WebTestCase
     public function testGetProviders(): void
     {
         $client = static::createClient();
-        $this->truncateEntities([ExchangeRate::class]);
         $this->clearCache();
         $resp = $this->jsonRequest($client, 'GET', '/api/v1/providers');
 

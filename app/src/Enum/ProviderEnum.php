@@ -29,4 +29,11 @@ enum ProviderEnum: string
     case CURRENCY_DATA_FEED = 'currency_data_feed';
     case CURRENCY_CONVERTER = 'currency_converter';
     case ABSTRACT_API = 'abstract_api';
+    case FRANKFURTER = 'frankfurter';
+    case BANK_OF_CANADA = 'bank_of_canada';
+    case BINANCE = 'binance';
+    case FRED = 'fred';
+    case MOEX = 'moex';
+    case BANXICO = 'banxico';
+    case BCB = 'bcb';
 }
