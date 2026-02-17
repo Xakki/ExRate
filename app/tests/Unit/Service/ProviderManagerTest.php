@@ -61,7 +61,7 @@ class ProviderManagerTest extends TestCase
         $baseCurrency = 'RUR';
         $provider = ProviderEnum::CBR;
 
-        $cachedResponse = new RateResponse('75.0', null, '2024-01-01', null);
+        $cachedResponse = new RateResponse('75.0', '2024-01-01', null, null);
 
         $this->correctedDayCache->method('get')->with($provider, $date)->willReturn($date);
 
@@ -82,7 +82,7 @@ class ProviderManagerTest extends TestCase
         $providerEnum = ProviderEnum::CBR;
 
         $provider = $this->createMock(ProviderInterface::class);
-        $provider->method('getBaseCurrency')->willReturn('RUR');
+        $provider->method('getBaseCurrency')->willReturn($baseCurrency);
         $provider->method('getId')->willReturn(1);
         $provider->method('getEnum')->willReturn($providerEnum);
 
@@ -90,20 +90,19 @@ class ProviderManagerTest extends TestCase
         $this->rateCache->method('get')->willReturn(null);
         $this->correctedDayCache->method('get')->willReturn(null);
 
-        $rateEntity = new ExchangeRate($dateNow, $currency, $baseCurrency, '75.0');
+        $rateEntity = new ExchangeRate($dateNow, $currency, $baseCurrency, '75.0', $provider->getId());
 
-        $previousRateEntity = new ExchangeRate($dateNow->modify('-1 day'), $currency, $baseCurrency, '74.0');
+        $previousRateEntity = new ExchangeRate($dateNow->modify('-1 day'), $currency, $baseCurrency, '74.0', $provider->getId());
 
-        $this->repository->method('findOneByDateAndCurrency')
+        $this->repository->method('findTwoLastRates')
             ->willReturnCallback(function (int $providerId, string $currency, string $baseCurrency, \DateTimeImmutable $date) use ($dateNow, $rateEntity, $previousRateEntity) {
+                $rows = [];
                 if ($date->format('Y-m-d') === $dateNow->format('Y-m-d')) {
-                    return $rateEntity;
-                }
-                if ($date->format('Y-m-d') === $dateNow->modify('-1 day')->format('Y-m-d')) {
-                    return $previousRateEntity;
+                    $rows[] = $rateEntity;
+                    $rows[] = $previousRateEntity;
                 }
 
-                return null;
+                return $rows;
             });
 
         $this->rateCache->expects($this->once())->method('set');
@@ -122,7 +121,7 @@ class ProviderManagerTest extends TestCase
         $providerEnum = ProviderEnum::CBR;
 
         $provider = $this->createMock(ProviderInterface::class);
-        $provider->method('getBaseCurrency')->willReturn('RUR');
+        $provider->method('getBaseCurrency')->willReturn($baseCurrency);
         $provider->method('getId')->willReturn(1);
         $provider->method('getEnum')->willReturn($providerEnum);
 
@@ -130,20 +129,19 @@ class ProviderManagerTest extends TestCase
         $this->rateCache->method('get')->willReturn(null);
         $this->correctedDayCache->method('get')->willReturn(null);
 
-        $rateEntity = new ExchangeRate($dateNow, $currency, $baseCurrency, '75.0');
+        $rateEntity = new ExchangeRate($dateNow, $currency, $baseCurrency, '75.0', $provider->getId());
 
-        $previousRateEntity = new ExchangeRate($dateNow->modify('-1 day'), $currency, $baseCurrency, '74.0');
+        $previousRateEntity = new ExchangeRate($dateNow->modify('-1 day'), $currency, $baseCurrency, '74.0', $provider->getId());
 
-        $this->repository->method('findOneByDateAndCurrency')
+        $this->repository->method('findTwoLastRates')
             ->willReturnCallback(function (int $providerId, string $currency, string $baseCurrency, \DateTimeImmutable $date) use ($dateNow, $rateEntity, $previousRateEntity) {
+                $rows = [];
                 if ($date->format('Y-m-d') === $dateNow->format('Y-m-d')) {
-                    return $rateEntity;
-                }
-                if ($date->format('Y-m-d') === $dateNow->modify('-1 day')->format('Y-m-d')) {
-                    return $previousRateEntity;
+                    $rows[] = $rateEntity;
+                    $rows[] = $previousRateEntity;
                 }
 
-                return null;
+                return $rows;
             });
 
         $result = $this->provider->getRate($dateNow, $currency, $baseCurrency, $providerEnum);
@@ -168,7 +166,7 @@ class ProviderManagerTest extends TestCase
         $this->rateCache->method('get')->willReturn(null);
         $this->correctedDayCache->method('get')->willReturn(null);
 
-        $this->repository->method('findOneByDateAndCurrency')->willReturn(null);
+        $this->repository->method('findTwoLastRates')->willReturn([]);
 
         $this->expectException(RateNotFoundException::class);
 

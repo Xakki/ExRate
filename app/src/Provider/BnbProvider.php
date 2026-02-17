@@ -7,22 +7,22 @@ namespace App\Provider;
 use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
 use App\Enum\ProviderEnum;
+use App\Exception\FailedProviderException;
 use App\Util\BcMath;
+use App\Util\RequestTrait;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * @see https://www.bnb.bg
- *
- * @todo URL returns HTML instead of XML. Needs update or fix.
  */
 final readonly class BnbProvider implements ProviderInterface
 {
-    public const string URL = 'https://www.bnb.bg/Statistics/StExternalSector/StExchangeRates/StERForeignCurrencies/index.htm?lang=EN&downloadOper=true&group1=first&firstDays=%s&firstMonths=%s&firstYear=%s&search=true&showChart=false&showChartButton=false&type=XML';
+    use RequestTrait;
 
     public function __construct(
         private HttpClientInterface $httpClient,
+        private string $url,
         private int $id,
-        private int $currencyPrecision,
     ) {
     }
 
@@ -56,43 +56,41 @@ final readonly class BnbProvider implements ProviderInterface
         return 'Bulgarian National Bank';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getDaysLag(): int
+    {
+        return 0;
+    }
+
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
     {
         $day = $date->format('d');
         $month = $date->format('m');
         $year = $date->format('Y');
 
-        $url = sprintf(self::URL, $day, $month, $year);
+        $url = $this->url.sprintf('?lang=EN&downloadOper=true&group1=first&firstDays=%s&firstMonths=%s&firstYear=%s&search=true&showChart=false&showChartButton=false&type=XML', $day, $month, $year);
 
-        $response = $this->httpClient->request('GET', $url);
-        $content = $response->getContent();
-
-        if ('<ROWSET>' !== mb_substr($content, 0, 8)) {
+        try {
+            $xml = $this->xmlRequest($url);
+        } catch (FailedProviderException) {
             return new GetRatesResult($this->getId(), $this->getBaseCurrency(), $date, []);
-        }
-        $xml = simplexml_load_string($content);
-
-        if (false === $xml) {
-            throw new \RuntimeException('Failed to parse BNB XML response');
         }
 
         $rates = [];
-        $responseDate = $date;
+        $responseDate = null;
 
         foreach ($xml->ROW as $row) {
-            $code = (string) $row->CODE;
-            if (!$code) {
+            if (isset($row->TITLE)) {
                 continue;
             }
+            $code = (string) $row->CODE;
             $rate = (string) $row->RATE;
-            $ratio = (string) $row->RATIO;
 
-            if ($rate && $ratio) {
-                $rates[$code] = BcMath::div($rate, $ratio, $this->currencyPrecision);
+            if ($rate) {
+                $rates[$code] = BcMath::normalize($rate);
             }
 
-            if (isset($row->CURR_DATE)) {
-                $responseDate = \DateTimeImmutable::createFromFormat('d.m.Y', (string) $row->CURR_DATE) ?: $responseDate;
+            if (!$responseDate) {
+                $responseDate = \DateTimeImmutable::createFromFormat('d.m.Y', (string) $row->CURR_DATE) ?: $date;
             }
         }
 
@@ -101,7 +99,7 @@ final readonly class BnbProvider implements ProviderInterface
 
     public function isActive(): bool
     {
-        return false;
+        return true;
     }
 
     public function getAvailableCurrencies(): array
@@ -122,5 +120,13 @@ final readonly class BnbProvider implements ProviderInterface
     public function getRequestDelay(): int
     {
         return 2;
+    }
+
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
+    {
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

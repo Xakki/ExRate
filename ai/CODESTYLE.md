@@ -8,6 +8,7 @@
 - Use strict typing for arguments and return values;
 - Use only DTO instead of array for the return values of the methods;
 - if need to delete file - clear them and writ "@deleted" into the file;
+- If the method has more than 2 parameters, then be sure to use named parameters (with line-by-line formatting).
 - **Constants**: Always specify the type (e.g., `public const string MY_CONST = 'value';`).
 - **Values & Configuration**:
     - Do not use hardcoded numeric or string values (magic numbers/strings) directly in logic.

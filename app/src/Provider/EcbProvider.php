@@ -7,7 +7,9 @@ namespace App\Provider;
 use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
 use App\Enum\ProviderEnum;
+use App\Exception\FailedProviderException;
 use App\Util\BcMath;
+use App\Util\RequestTrait;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -15,12 +17,11 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class EcbProvider implements ProviderInterface
 {
-    public const string DAILY_URL = 'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml';
-    public const string HISTORICAL_URL_90_DAYS = 'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml';
-    public const string HISTORICAL_URL_ALL = 'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.xml';
+    use RequestTrait;
 
     public function __construct(
         private HttpClientInterface $httpClient,
+        private string $url,
         private int $id,
         private int $currencyPrecision,
     ) {
@@ -56,18 +57,16 @@ final readonly class EcbProvider implements ProviderInterface
         return 'The European Central Bank (ECB) is the central bank of the European Union countries which have adopted the euro.';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getDaysLag(): int
+    {
+        return 0;
+    }
+
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
     {
         $url = $this->getUrlForDate($date);
 
-        $response = $this->httpClient->request('GET', $url);
-        $content = $response->getContent();
-
-        $xml = simplexml_load_string($content);
-
-        if (false === $xml) {
-            throw new \RuntimeException('Failed to parse ECB XML response');
-        }
+        $xml = $this->xmlRequest($url);
 
         $xml->registerXPathNamespace('gesmes', 'http://www.gesmes.org/xml/2002-08-01');
         $xml->registerXPathNamespace('ns', 'http://www.ecb.int/vocabulary/2002-08-01/eurofxref');
@@ -97,7 +96,7 @@ final readonly class EcbProvider implements ProviderInterface
             }
 
             if (!$bestCube) {
-                throw new \RuntimeException(sprintf('No ECB rates found for date %s', $targetDateStr));
+                throw new FailedProviderException(sprintf('No ECB rates found for date %s', $targetDateStr));
             }
             $cube = [$bestCube];
         }
@@ -129,15 +128,17 @@ final readonly class EcbProvider implements ProviderInterface
         $now = new \DateTimeImmutable();
         $diff = $now->diff($date)->days;
 
+        $baseUrl = rtrim($this->url, '/');
+
         if ($diff <= 1) {
-            return self::DAILY_URL;
+            return $baseUrl.'/eurofxref-daily.xml';
         }
 
         if ($diff <= 90) {
-            return self::HISTORICAL_URL_90_DAYS;
+            return $baseUrl.'/eurofxref-hist-90d.xml';
         }
 
-        return self::HISTORICAL_URL_ALL;
+        return $baseUrl.'/eurofxref-hist.xml';
     }
 
     public function getRequestLimit(): int
@@ -153,5 +154,13 @@ final readonly class EcbProvider implements ProviderInterface
     public function getRequestDelay(): int
     {
         return 2;
+    }
+
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
+    {
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

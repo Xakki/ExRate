@@ -10,7 +10,7 @@ use OpenApi\Attributes as OA;
     title: 'Provider',
     description: 'Information about an exchange rate provider.'
 )]
-readonly class ProviderDTO
+readonly class Provider
 {
     /**
      * @param string[] $currencies
@@ -22,15 +22,17 @@ readonly class ProviderDTO
         public string $homePage,
         #[OA\Property(description: 'Description of the provider', example: 'Central Bank of the Russian Federation')]
         public string $description,
-        #[OA\Property(
-            description: 'List of available currencies for this provider',
-            type: 'array',
-            items: new OA\Items(type: 'string'),
-            example: ['USD', 'EUR', 'GBP']
-        )]
-        public array $currencies,
         #[OA\Property(description: 'Base currency used by the provider', example: 'RUB')]
         public string $baseCurrency,
+        #[OA\Property(
+            description: 'List of available currency codes for this provider',
+            type: 'array',
+            items: new OA\Items(type: 'string'),
+            example: ['USD', 'EUR']
+        )]
+        public array $currencies,
+        #[OA\Property(description: 'Minimum available date in the database', format: 'date', example: '1993-01-29')]
+        public ?string $minDate = null,
     ) {
     }
 }

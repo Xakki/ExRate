@@ -26,17 +26,17 @@ class TimeseriesRequest
     public string $endDate = '';
 
     #[Assert\NotBlank]
-    #[Assert\Currency]
-    #[OA\Property(description: 'Target currency code (ISO 4217)', maxLength: 3, minLength: 3, example: 'USD')]
+    #[Assert\Length(min: 2, max: 10)]
+    #[OA\Property(description: 'Target currency code', maxLength: 10, minLength: 2, example: 'USD')]
     public string $currency = '';
 
-    #[Assert\Currency]
-    #[OA\Property(description: 'Base currency code (ISO 4217)', maxLength: 3, minLength: 3, example: 'RUB')]
-    public string $baseCurrency = 'RUB';
+    #[Assert\Length(min: 2, max: 10)]
+    #[OA\Property(description: 'Base currency code', maxLength: 10, minLength: 2, example: 'EUR')]
+    public string $baseCurrency = 'EUR';
 
     #[Assert\Choice(callback: [ProviderEnum::class, 'cases'])]
-    #[OA\Property(description: 'Data provider', type: 'string', enum: [ProviderEnum::CBR], default: 'cbr')]
-    public ProviderEnum $provider = ProviderEnum::CBR;
+    #[OA\Property(description: 'Data provider', type: 'string', enum: [ProviderEnum::ECB], default: 'ecb')]
+    public ProviderEnum $provider = ProviderEnum::ECB;
 
     #[Assert\Callback]
     public function validateDateRange(ExecutionContextInterface $context): void
@@ -48,15 +48,14 @@ class TimeseriesRequest
             return;
         }
 
-        if ($start > $end) {
+        if ($start->diff($end)->invert) {
             $context->buildViolation('Start date must be before or equal to end date.')
                 ->atPath('startDate')
                 ->addViolation();
         }
 
-        $diff = $start->diff($end);
-        if ($diff->y >= 5) {
-            $context->buildViolation('The maximum allowed range is 5 years.')
+        if ($start->diff($end)->y > 5) {
+            $context->buildViolation('The maximum allowed range more than 5 years for free.')
                 ->atPath('endDate')
                 ->addViolation();
         }
@@ -71,7 +70,7 @@ class TimeseriesRequest
             throw new \UnexpectedValueException('Invalid start date format');
         }
 
-        return $date->setTime(0, 0);
+        return $date->setTime(12, 0);
     }
 
     #[Ignore]
@@ -83,6 +82,6 @@ class TimeseriesRequest
             throw new \UnexpectedValueException('Invalid end date format');
         }
 
-        return $date->setTime(0, 0);
+        return $date->setTime(12, 0);
     }
 }

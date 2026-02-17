@@ -10,7 +10,6 @@ use App\Contract\Cache\TimeseriesCacheInterface;
 use App\Contract\ProviderInterface;
 use App\DTO\RateResponse;
 use App\DTO\TimeseriesResponse;
-use App\Entity\ExchangeRate;
 use App\Enum\ProviderEnum;
 use App\Exception\RateNotFoundException;
 use App\Repository\ExchangeRateRepository;
@@ -28,7 +27,7 @@ readonly class ProviderManager
     ) {
     }
 
-    public function getTimeseries(\DateTimeImmutable $start, \DateTimeImmutable $end, string $currency, string $baseCurrency, ProviderEnum $providerEnum = ProviderEnum::CBR): TimeseriesResponse
+    public function getTimeseries(\DateTimeImmutable $start, \DateTimeImmutable $end, string $currency, string $baseCurrency, ProviderEnum $providerEnum = ProviderEnum::ECB): TimeseriesResponse
     {
         if ($cached = $this->timeseriesCache->get($start, $end, $providerEnum, $baseCurrency, $currency)) {
             return $cached;
@@ -79,7 +78,7 @@ readonly class ProviderManager
         return $map;
     }
 
-    public function getRate(\DateTimeImmutable $date, string $currency, string $baseCurrency, ProviderEnum $providerEnum = ProviderEnum::CBR): RateResponse
+    public function getRate(\DateTimeImmutable $date, string $currency, string $baseCurrency, ProviderEnum $providerEnum = ProviderEnum::ECB): RateResponse
     {
         $date = $this->getCorrectedDay($providerEnum, $date);
 
@@ -96,7 +95,8 @@ readonly class ProviderManager
             $response = $this->fetchDirectRate($provider, $date, $currency);
         }
 
-        if (null !== $response->diff) {
+        if ($response->isFullData()) {
+            // Если данные полные - кешируем
             $this->rateCache->set($date, $providerEnum, $baseCurrency, $currency, $response);
         }
 
@@ -143,8 +143,8 @@ readonly class ProviderManager
 
         return new RateResponse(
             rate: $rate,
-            diff: $diff,
             date: $targetTo->date,
+            diff: $diff,
             dateDiff: $dateDiff,
         );
     }
@@ -163,35 +163,26 @@ readonly class ProviderManager
 
     private function fetchDirectRate(ProviderInterface $provider, \DateTimeImmutable $date, string $currency): RateResponse
     {
-        $rateEntity = $this->repository->findOneByDateAndCurrency($provider->getId(), $currency, $provider->getBaseCurrency(), $date);
+        $rates = $this->repository->findTwoLastRates($provider->getId(), $currency, $provider->getBaseCurrency(), $date);
 
-        if (!$rateEntity) {
+        if (!$rates) {
             throw new RateNotFoundException($currency, $provider->getBaseCurrency());
         }
 
-        return $this->createResponse($provider, $rateEntity);
-    }
-
-    private function createResponse(ProviderInterface $provider, ExchangeRate $rateEntity): RateResponse
-    {
         $diff = null;
         $dateDiff = null;
-        $previousDate = $rateEntity->getDate()->modify('-1 day');
-        $previousDate = $this->getCorrectedDay($provider->getEnum(), $previousDate);
 
-        $previousRate = $this->repository->findOneByDateAndCurrency($provider->getId(), $rateEntity->getCurrency(), $rateEntity->getBaseCurrency(), $previousDate);
-
-        if ($previousRate) {
-            $rate = $this->requireNumericString($rateEntity->getRate(), 'current rate');
-            $previous = $this->requireNumericString($previousRate->getRate(), 'previous rate');
-            $diff = BcMath::sub($rate, $previous, $this->currencyPrecision);
-            $dateDiff = $previousRate->getDate()->format('Y-m-d');
+        if (isset($rates[1])) {
+            $current = $this->requireNumericString($rates[0]->getRate(), 'current rate');
+            $previous = $this->requireNumericString($rates[1]->getRate(), 'previous rate');
+            $diff = BcMath::sub($current, $previous, $this->currencyPrecision);
+            $dateDiff = $rates[1]->getDate()->format('Y-m-d');
         }
 
         return new RateResponse(
-            rate: $rateEntity->getRate(),
+            rate: $rates[0]->getRate(),
+            date: $rates[0]->getDate()->format('Y-m-d'),
             diff: $diff,
-            date: $rateEntity->getDate()->format('Y-m-d'),
             dateDiff: $dateDiff,
         );
     }

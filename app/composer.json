@@ -12,6 +12,7 @@
         "ext-bcmath": "*",
         "ext-ctype": "*",
         "ext-iconv": "*",
+        "ext-intl": "*",
         "ext-pcntl": "*",
         "ext-redis": "*",
         "ext-simplexml": "*",
@@ -98,7 +99,7 @@
         "test:cs-fix": "XDEBUG_MODE=off vendor/bin/php-cs-fixer fix",
         "test": "XDEBUG_MODE=off APP_ENV=test bin/phpunit --log-junit report.xml",
         "test:unit": "XDEBUG_MODE=off APP_ENV=test bin/phpunit --testsuite unit --log-junit report_unit.xml",
-        "test:integration": "XDEBUG_MODE=off APP_ENV=test bin/phpunit --testsuite integration --log-junit report_integration.xml",
+        "test:integration": "XDEBUG_MODE=off APP_ENV=test bin/phpunit --testsuite integration --stop-on-failure --log-junit report_integration.xml",
         "test:functional": "XDEBUG_MODE=off APP_ENV=test bin/phpunit --testsuite functional --log-junit report_functional.xml"
     },
     "conflict": {

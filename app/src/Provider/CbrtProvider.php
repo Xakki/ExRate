@@ -7,7 +7,9 @@ namespace App\Provider;
 use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
 use App\Enum\ProviderEnum;
+use App\Exception\FailedProviderException;
 use App\Util\BcMath;
+use App\Util\RequestTrait;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -15,10 +17,11 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class CbrtProvider implements ProviderInterface
 {
-    public const string BASE_URL = 'https://www.tcmb.gov.tr/kurlar/';
+    use RequestTrait;
 
     public function __construct(
         private HttpClientInterface $httpClient,
+        private string $url,
         private int $id,
         private int $currencyPrecision,
     ) {
@@ -54,7 +57,12 @@ final readonly class CbrtProvider implements ProviderInterface
         return 'Central Bank of the Republic of Turkey';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getDaysLag(): int
+    {
+        return 0;
+    }
+
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
     {
         return $this->getRatesTry($date);
     }
@@ -63,7 +71,7 @@ final readonly class CbrtProvider implements ProviderInterface
     {
         $url = $this->buildUrl($date);
 
-        $response = $this->httpClient->request('GET', $url);
+        $response = $this->request($url);
 
         // CBRT returns 404 if no rates for the day (e.g. weekend)
         if (404 === $response->getStatusCode()) {
@@ -78,11 +86,10 @@ final readonly class CbrtProvider implements ProviderInterface
             return $this->getRatesTry($prevDate, ++$try);
         }
 
-        $content = $response->getContent();
-        $xml = simplexml_load_string($content);
+        $xml = simplexml_load_string($response->getContent(false));
 
         if (false === $xml) {
-            throw new \RuntimeException('Failed to parse CBRT XML response');
+            throw new FailedProviderException('Failed to parse CBRT XML response');
         }
 
         $responseDate = new \DateTimeImmutable((string) $xml['Date']);
@@ -114,14 +121,16 @@ final readonly class CbrtProvider implements ProviderInterface
     private function buildUrl(\DateTimeImmutable $date): string
     {
         $now = new \DateTimeImmutable();
+        $baseUrl = rtrim($this->url, '/').'/';
+
         if ($date->format('Y-m-d') === $now->format('Y-m-d')) {
-            return self::BASE_URL.'today.xml';
+            return $baseUrl.'today.xml';
         }
 
         $yearMonth = $date->format('Ym');
         $dayMonthYear = $date->format('dmY');
 
-        return self::BASE_URL.$yearMonth.'/'.$dayMonthYear.'.xml';
+        return $baseUrl.$yearMonth.'/'.$dayMonthYear.'.xml';
     }
 
     public function getRequestLimit(): int
@@ -137,5 +146,13 @@ final readonly class CbrtProvider implements ProviderInterface
     public function getRequestDelay(): int
     {
         return 2;
+    }
+
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
+    {
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

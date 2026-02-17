@@ -8,7 +8,9 @@ use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
 use App\Enum\ProviderEnum;
 use App\Exception\DisabledProviderException;
+use App\Exception\FailedProviderException;
 use App\Util\BcMath;
+use App\Util\RequestTrait;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -18,11 +20,11 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class CurrencyLayerProvider implements ProviderInterface
 {
-    public const string LATEST_URL = 'http://apilayer.net/api/live';
-    public const string HISTORICAL_URL = 'http://apilayer.net/api/historical';
+    use RequestTrait;
 
     public function __construct(
         private HttpClientInterface $httpClient,
+        private string $url,
         private string $accessKey,
         private int $id,
         private int $currencyPrecision,
@@ -68,10 +70,16 @@ final readonly class CurrencyLayerProvider implements ProviderInterface
         return 'Real-time Exchange Rates & Currency Conversion JSON API';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getDaysLag(): int
+    {
+        return 0;
+    }
+
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
     {
         $isToday = $date->format('Y-m-d') === (new \DateTimeImmutable())->format('Y-m-d');
-        $url = $isToday ? self::LATEST_URL : self::HISTORICAL_URL;
+        $baseUrl = rtrim($this->url, '/');
+        $url = $isToday ? $baseUrl.'/live' : $baseUrl.'/historical';
 
         $query = [
             'access_key' => $this->accessKey,
@@ -81,15 +89,12 @@ final readonly class CurrencyLayerProvider implements ProviderInterface
             $query['date'] = $date->format('Y-m-d');
         }
 
-        $response = $this->httpClient->request('GET', $url, [
+        $data = $this->jsonRequest($url, options: [
             'query' => $query,
         ]);
 
-        $content = $response->getContent();
-        $data = json_decode($content, true);
-
-        if (!is_array($data) || !isset($data['success']) || !$data['success']) {
-            throw new \RuntimeException($data['error']['info'] ?? 'Failed to parse Currency Layer response');
+        if (!isset($data['success']) || !$data['success']) {
+            throw new FailedProviderException($data['error']['info'] ?? 'Failed to parse Currency Layer response');
         }
 
         $responseDate = (new \DateTimeImmutable(timezone: new \DateTimeZone('UTC')))->setTimestamp($data['timestamp']);
@@ -122,5 +127,13 @@ final readonly class CurrencyLayerProvider implements ProviderInterface
     public function getRequestDelay(): int
     {
         return 2;
+    }
+
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
+    {
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

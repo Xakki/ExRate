@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
-use App\DTO\ProviderDTO;
+use App\DTO\Provider;
 use App\Service\ProviderRegistry;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -25,7 +25,7 @@ class ProviderController extends AbstractController
         description: 'Returns the list of all available exchange rate providers',
         content: new OA\JsonContent(
             type: 'array',
-            items: new OA\Items(ref: new Model(type: ProviderDTO::class))
+            items: new OA\Items(ref: new Model(type: Provider::class))
         )
     )]
     public function getProviders(): JsonResponse

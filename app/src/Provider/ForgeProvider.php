@@ -9,6 +9,7 @@ use App\DTO\GetRatesResult;
 use App\Enum\ProviderEnum;
 use App\Exception\DisabledProviderException;
 use App\Util\BcMath;
+use App\Util\RequestTrait;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -16,10 +17,11 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class ForgeProvider implements ProviderInterface
 {
-    public const string URL = 'https://api.1forge.com/quotes?pairs=USD/EUR,USD/GBP,USD/JPY,USD/RUB';
+    use RequestTrait;
 
     public function __construct(
         private HttpClientInterface $httpClient,
+        private string $url,
         private string $apiKey,
         private int $id,
         private int $currencyPrecision,
@@ -64,21 +66,20 @@ final readonly class ForgeProvider implements ProviderInterface
         return 'Real-time Forex and Crypto API';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getDaysLag(): int
+    {
+        return 0;
+    }
+
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
     {
         // Forge API requires specific pairs. This is just an example implementation.
-        $response = $this->httpClient->request('GET', self::URL, [
+        $url = rtrim($this->url, '/').'/quotes?pairs=USD/EUR,USD/GBP,USD/JPY,USD/RUB';
+        $data = $this->jsonRequest($url, options: [
             'query' => [
                 'api_key' => $this->apiKey,
             ],
         ]);
-
-        $content = $response->getContent();
-        $data = json_decode($content, true);
-
-        if (!is_array($data)) {
-            throw new \RuntimeException('Failed to parse Forge response');
-        }
 
         $rates = [];
         $responseDate = $date;
@@ -113,5 +114,13 @@ final readonly class ForgeProvider implements ProviderInterface
     public function getRequestDelay(): int
     {
         return 2;
+    }
+
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
+    {
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

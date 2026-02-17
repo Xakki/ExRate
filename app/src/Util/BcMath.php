@@ -70,7 +70,7 @@ final class BcMath
         return \bcadd($value, $add, $scale);
     }
 
-    private static function normalize(string|int|float $value): string
+    public static function normalize(string|int|float $value): string
     {
         $value = str_replace(',', '.', (string) $value);
 

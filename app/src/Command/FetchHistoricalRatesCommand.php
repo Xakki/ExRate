@@ -63,10 +63,10 @@ class FetchHistoricalRatesCommand extends Command
             }
         }
 
-        $today = new \DateTimeImmutable();
+        $yesterday = new \DateTimeImmutable()->modify('-1 day');
 
         foreach ($allowProviders as $provider) {
-            $message = new FetchRateMessage($today, $provider->getEnum(), $days);
+            $message = new FetchRateMessage($yesterday, $provider->getEnum(), $days);
             $this->bus->dispatch($message, $message->getStamps(cache: $this->rateLimitCache, provider: $provider));
         }
 

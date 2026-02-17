@@ -8,7 +8,9 @@ use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
 use App\Enum\ProviderEnum;
 use App\Exception\DisabledProviderException;
+use App\Exception\FailedProviderException;
 use App\Util\BcMath;
+use App\Util\RequestTrait;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -16,11 +18,11 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class OpenExchangeRatesProvider implements ProviderInterface
 {
-    public const string LATEST_URL = 'https://openexchangerates.org/api/latest.json?show_alternative=1';
-    public const string HISTORICAL_URL = 'https://openexchangerates.org/api/historical/%s.json?show_alternative=1';
+    use RequestTrait;
 
     public function __construct(
         private HttpClientInterface $httpClient,
+        private string $url,
         private string $appId,
         private int $id,
         private int $currencyPrecision,
@@ -65,22 +67,25 @@ final readonly class OpenExchangeRatesProvider implements ProviderInterface
         return 'The original simple, accurate and transparent exchange rates and currency conversion data API.';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getDaysLag(): int
+    {
+        return 0;
+    }
+
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
     {
         $isToday = $date->format('Y-m-d') === (new \DateTimeImmutable())->format('Y-m-d');
-        $url = $isToday ? self::LATEST_URL : sprintf(self::HISTORICAL_URL, $date->format('Y-m-d'));
+        $baseUrl = rtrim($this->url, '/');
+        $url = $isToday ? $baseUrl.'/latest.json?show_alternative=1' : sprintf($baseUrl.'/historical/%s.json?show_alternative=1', $date->format('Y-m-d'));
 
-        $response = $this->httpClient->request('GET', $url, [
+        $data = $this->jsonRequest($url, options: [
             'query' => [
                 'app_id' => $this->appId,
             ],
         ]);
 
-        $content = $response->getContent();
-        $data = json_decode($content, true, flags: JSON_BIGINT_AS_STRING | JSON_THROW_ON_ERROR);
-
-        if (!is_array($data) || isset($data['error'])) {
-            throw new \RuntimeException($data['description'] ?? 'Failed to parse Open Exchange Rates response');
+        if (isset($data['error'])) {
+            throw new FailedProviderException($data['description'] ?? 'Failed to parse Open Exchange Rates response');
         }
 
         $responseDate = (new \DateTimeImmutable(timezone: new \DateTimeZone('UTC')))
@@ -112,5 +117,13 @@ final readonly class OpenExchangeRatesProvider implements ProviderInterface
     public function getRequestDelay(): int
     {
         return 2;
+    }
+
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
+    {
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

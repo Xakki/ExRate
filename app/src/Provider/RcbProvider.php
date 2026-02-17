@@ -8,6 +8,8 @@ use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
 use App\Enum\ProviderEnum;
 use App\Util\BcMath;
+use App\Util\RequestTrait;
+use App\Util\UrlTemplateTrait;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -15,10 +17,12 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class RcbProvider implements ProviderInterface
 {
-    public const string BASE_URL = 'https://cbu.uz/common/json';
+    use UrlTemplateTrait;
+    use RequestTrait;
 
     public function __construct(
         private HttpClientInterface $httpClient,
+        private string $url,
         private int $id,
         private int $currencyPrecision,
     ) {
@@ -54,17 +58,16 @@ final readonly class RcbProvider implements ProviderInterface
         return 'Central Bank of the Republic of Uzbekistan';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getDaysLag(): int
     {
-        $url = self::BASE_URL.'/?date='.$date->format('d.m.Y');
+        return 0;
+    }
 
-        $response = $this->httpClient->request('GET', $url);
-        $content = $response->getContent();
-        $data = json_decode($content, true);
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
+    {
+        $url = $this->prepareUrl($this->url, $date, $this->getBaseCurrency());
 
-        if (!is_array($data)) {
-            throw new \RuntimeException('Failed to parse RCB JSON response');
-        }
+        $data = $this->jsonRequest($url);
 
         $rates = [];
         $responseDate = $date;
@@ -107,5 +110,13 @@ final readonly class RcbProvider implements ProviderInterface
     public function getRequestDelay(): int
     {
         return 2;
+    }
+
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
+    {
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

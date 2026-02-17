@@ -35,8 +35,8 @@ class ExchangeRate
         #[ORM\Column(type: Types::DECIMAL, precision: 20, scale: 8)]
         private string $rate,
 
-        #[ORM\Column(type: Types::INTEGER, options: ['default' => 1])]
-        private int $providerId = 1,
+        #[ORM\Column(type: Types::INTEGER)]
+        private int $providerId,
     ) {
         $this->createdAt = new \DateTimeImmutable();
     }

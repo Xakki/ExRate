@@ -7,7 +7,9 @@ namespace App\Provider;
 use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
 use App\Enum\ProviderEnum;
+use App\Exception\FailedProviderException;
 use App\Util\BcMath;
+use App\Util\RequestTrait;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -15,11 +17,11 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class NbrProvider implements ProviderInterface
 {
-    public const string URL = 'https://curs.bnr.ro/nbrfxrates.xml';
-    public const string HISTORICAL_URL_TEMPLATE = 'https://curs.bnr.ro/files/xml/years/nbrfxrates{year}.xml';
+    use RequestTrait;
 
     public function __construct(
         private HttpClientInterface $httpClient,
+        private string $url,
         private int $id,
         private int $currencyPrecision,
     ) {
@@ -55,21 +57,20 @@ final readonly class NbrProvider implements ProviderInterface
         return 'National Bank of Romania';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getDaysLag(): int
+    {
+        return 0;
+    }
+
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
     {
         $year = $date->format('Y');
         $isToday = $date->format('Y-m-d') === (new \DateTimeImmutable())->format('Y-m-d');
 
-        $url = $isToday ? self::URL : str_replace('{year}', $year, self::HISTORICAL_URL_TEMPLATE);
+        $baseUrl = rtrim($this->url, '/');
+        $url = $isToday ? $baseUrl.'/nbrfxrates.xml' : $baseUrl."/files/xml/years/nbrfxrates{$year}.xml";
 
-        $response = $this->httpClient->request('GET', $url);
-        $content = $response->getContent();
-
-        $xml = simplexml_load_string($content);
-
-        if (false === $xml) {
-            throw new \RuntimeException('Failed to parse NBR XML response');
-        }
+        $xml = $this->xmlRequest($url);
 
         $xml->registerXPathNamespace('ns', 'http://www.bnr.ro/xsd');
 
@@ -101,12 +102,12 @@ final readonly class NbrProvider implements ProviderInterface
             } elseif ($bestCube) {
                 $cube = [$bestCube];
             } else {
-                throw new \RuntimeException(sprintf('No NBR rates found for date %s', $targetDateStr));
+                return new GetRatesResult($this->getId(), $this->getBaseCurrency(), $date, []);
             }
         }
 
         if (!$cube || !isset($cube[0])) {
-            throw new \RuntimeException(sprintf('No NBR rates found for date %s', $targetDateStr));
+            throw new FailedProviderException(sprintf('No NBR rates found for date %s', $targetDateStr));
         }
 
         $responseDateStr = (string) ($cube[0]['date'] ?? $xml->xpath('//ns:PublishingDate')[0] ?? $targetDateStr);
@@ -147,5 +148,13 @@ final readonly class NbrProvider implements ProviderInterface
     public function getRequestDelay(): int
     {
         return 2;
+    }
+
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
+    {
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

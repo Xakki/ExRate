@@ -8,6 +8,8 @@ use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
 use App\Enum\ProviderEnum;
 use App\Util\BcMath;
+use App\Util\RequestTrait;
+use App\Util\UrlTemplateTrait;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -15,10 +17,12 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class NbuProvider implements ProviderInterface
 {
-    public const string URL = 'https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange';
+    use UrlTemplateTrait;
+    use RequestTrait;
 
     public function __construct(
         private HttpClientInterface $httpClient,
+        private string $url,
         private int $id,
         private int $currencyPrecision,
     ) {
@@ -54,19 +58,16 @@ final readonly class NbuProvider implements ProviderInterface
         return 'National Bank of Ukraine';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getDaysLag(): int
     {
-        $formattedDate = $date->format('Ymd');
-        $url = self::URL.'?date='.$formattedDate;
+        return 0;
+    }
 
-        $response = $this->httpClient->request('GET', $url);
-        $content = $response->getContent();
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
+    {
+        $url = $this->prepareUrl($this->url, $date, $this->getBaseCurrency());
 
-        $xml = simplexml_load_string($content);
-
-        if (false === $xml) {
-            throw new \RuntimeException('Failed to parse NBU XML response');
-        }
+        $xml = $this->xmlRequest($url);
 
         $rates = [];
         $responseDate = $date;
@@ -110,5 +111,13 @@ final readonly class NbuProvider implements ProviderInterface
     public function getRequestDelay(): int
     {
         return 2;
+    }
+
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
+    {
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

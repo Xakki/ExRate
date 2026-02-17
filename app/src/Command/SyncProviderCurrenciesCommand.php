@@ -46,7 +46,7 @@ class SyncProviderCurrenciesCommand extends Command
             $io->section(sprintf('Checking %s...', $providerEnum->value));
 
             try {
-                $ratesResult = $provider->getRates(new \DateTimeImmutable());
+                $ratesResult = $provider->getRatesByDate(new \DateTimeImmutable());
                 if (!count($ratesResult->rates)) {
                     $io->warning(sprintf('Provider %s return empty rates (Weekend?), skipping.', $providerEnum->value));
                     continue;

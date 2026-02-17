@@ -7,7 +7,10 @@ namespace App\Provider;
 use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
 use App\Enum\ProviderEnum;
+use App\Exception\FailedProviderException;
 use App\Util\BcMath;
+use App\Util\RequestTrait;
+use App\Util\UrlTemplateTrait;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -15,10 +18,12 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class NbgProvider implements ProviderInterface
 {
-    public const string BASE_URL = 'https://nbg.gov.ge/gw/api/ct/monetarypolicy/currencies/en/json';
+    use UrlTemplateTrait;
+    use RequestTrait;
 
     public function __construct(
         private HttpClientInterface $httpClient,
+        private string $url,
         private int $id,
         private int $currencyPrecision,
     ) {
@@ -54,16 +59,19 @@ final readonly class NbgProvider implements ProviderInterface
         return 'National Bank of Georgia';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getDaysLag(): int
     {
-        $url = self::BASE_URL.'?date='.$date->format('Y-m-d');
+        return 0;
+    }
 
-        $response = $this->httpClient->request('GET', $url);
-        $content = $response->getContent();
-        $data = json_decode($content, true);
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
+    {
+        $url = $this->prepareUrl($this->url, $date, $this->getBaseCurrency());
 
-        if (!is_array($data) || !isset($data[0])) {
-            throw new \RuntimeException('Failed to parse NBG JSON response');
+        $data = $this->jsonRequest($url);
+
+        if (!isset($data[0])) {
+            throw new FailedProviderException('Failed to parse NBG JSON response');
         }
 
         $element = $data[0];
@@ -104,5 +112,13 @@ final readonly class NbgProvider implements ProviderInterface
     public function getRequestDelay(): int
     {
         return 2;
+    }
+
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
+    {
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

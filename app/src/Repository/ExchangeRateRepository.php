@@ -18,14 +18,48 @@ class ExchangeRateRepository extends ServiceEntityRepository
         parent::__construct($registry, ExchangeRate::class);
     }
 
-    public function findOneByDateAndCurrency(int $providerId, string $currency, string $baseCurrency, \DateTimeImmutable $date): ?ExchangeRate
+    /**
+     * First item is closet day, second item is previous closest day.
+     *
+     * @return ExchangeRate[]
+     */
+    public function findTwoLastRates(int $providerId, string $currency, string $baseCurrency, \DateTimeImmutable $maxDate, ?\DateTimeImmutable $minDate = null): array
     {
-        return $this->findOneBy([
-            'date' => $date,
-            'currency' => $currency,
-            'baseCurrency' => $baseCurrency,
-            'providerId' => $providerId,
-        ]);
+        $builder = $this->createQueryBuilder('er')
+            ->where('er.providerId = :providerId')
+            ->andWhere('er.currency = :currency')
+            ->andWhere('er.baseCurrency = :baseCurrency')
+            ->andWhere('er.date <= :maxDate')
+            ->setParameter('providerId', $providerId)
+            ->setParameter('currency', $currency)
+            ->setParameter('baseCurrency', $baseCurrency)
+            ->setParameter('maxDate', $maxDate);
+        if ($minDate) {
+            $builder->andWhere('er.date >= :minDate')
+                ->setParameter('minDate', $minDate);
+        }
+
+        return $builder->orderBy('er.date', 'DESC')
+            ->setMaxResults(2)
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function findOneByDateRange(int $providerId, string $baseCurrency, \DateTimeImmutable $minDate, \DateTimeImmutable $maxDate): ?ExchangeRate
+    {
+        return $this->createQueryBuilder('er')
+            ->where('er.providerId = :providerId')
+            ->andWhere('er.baseCurrency = :baseCurrency')
+            ->andWhere('er.date <= :maxDate')
+            ->setParameter('providerId', $providerId)
+            ->setParameter('baseCurrency', $baseCurrency)
+            ->setParameter('maxDate', $maxDate)
+            ->andWhere('er.date >= :minDate')
+            ->setParameter('minDate', $minDate)
+            ->orderBy('er.date', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
     }
 
     public function existRates(int $providerId, string $baseCurrency, \DateTimeImmutable $date): bool
@@ -75,6 +109,23 @@ class ExchangeRateRepository extends ServiceEntityRepository
             ->orderBy('er.date', 'ASC')
             ->getQuery()
             ->getResult();
+    }
+
+    public function getMinDate(?int $providerId = null): ?\DateTimeImmutable
+    {
+        $qb = $this->createQueryBuilder('er')
+            ->select('MIN(er.date)');
+
+        if (null !== $providerId) {
+            $qb->where('er.providerId = :providerId')
+                ->setParameter('providerId', $providerId);
+        }
+
+        $result = $qb->getQuery()
+            ->enableResultCache(3600)
+            ->getSingleScalarResult();
+
+        return $result ? new \DateTimeImmutable((string) $result) : null;
     }
 
     /**

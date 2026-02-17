@@ -8,6 +8,8 @@ use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
 use App\Enum\ProviderEnum;
 use App\Util\BcMath;
+use App\Util\RequestTrait;
+use App\Util\UrlTemplateTrait;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -15,6 +17,9 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class CbrProvider implements ProviderInterface
 {
+    use UrlTemplateTrait;
+    use RequestTrait;
+
     public function __construct(
         private HttpClientInterface $httpClient,
         private string $url,
@@ -53,43 +58,9 @@ final readonly class CbrProvider implements ProviderInterface
         return 'Central Bank of the Russian Federation';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getDaysLag(): int
     {
-        // CBR expects date in format dd/mm/yyyy
-        $dateStr = $date->format('d/m/Y');
-
-        $response = $this->httpClient->request('GET', $this->url, [
-            'query' => [
-                'date_req' => $dateStr,
-            ],
-            'timeout' => 5.0,
-        ]);
-
-        $content = $response->getContent();
-
-        $xml = simplexml_load_string($content);
-
-        if (false === $xml) {
-            throw new \RuntimeException('Failed to parse CBR XML response');
-        }
-
-        $rates = [];
-        if (isset($xml->Valute)) {
-            foreach ($xml->Valute as $valute) {
-                $code = (string) $valute->CharCode;
-                $value = (string) $valute->Value;
-                $nominal = (string) $valute->Nominal;
-
-                $rates[$code] = BcMath::div($value, $nominal, $this->currencyPrecision);
-            }
-        }
-
-        $responseDate = \DateTimeImmutable::createFromFormat('d.m.Y', (string) $xml['Date']);
-        if (false === $responseDate) {
-            $responseDate = $date;
-        }
-
-        return new GetRatesResult($this->getId(), $this->getBaseCurrency(), $responseDate, $rates);
+        return 0;
     }
 
     public function isActive(): bool
@@ -115,5 +86,38 @@ final readonly class CbrProvider implements ProviderInterface
     public function getRequestDelay(): int
     {
         return 2;
+    }
+
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
+    {
+        $url = $this->prepareUrl($this->url, $date, $this->getBaseCurrency());
+
+        $xml = $this->xmlRequest($url);
+
+        $rates = [];
+        if (isset($xml->Valute)) {
+            foreach ($xml->Valute as $valute) {
+                $code = (string) $valute->CharCode;
+                $value = (string) $valute->Value;
+                $nominal = (string) $valute->Nominal;
+
+                $rates[$code] = BcMath::div($value, $nominal, $this->currencyPrecision);
+            }
+        }
+
+        $responseDate = \DateTimeImmutable::createFromFormat('d.m.Y', (string) $xml['Date']);
+        if (false === $responseDate) {
+            $responseDate = $date;
+        }
+
+        return new GetRatesResult($this->getId(), $this->getBaseCurrency(), $responseDate, $rates);
+    }
+
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
+    {
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

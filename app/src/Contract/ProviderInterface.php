@@ -21,7 +21,17 @@ interface ProviderInterface
 
     public function getDescription(): string;
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult;
+    /*
+     * Указывает день последних доступных курсов (NOW - getDaysLag)
+     */
+    public function getDaysLag(): int;
+
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult;
+
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array;
 
     public function isActive(): bool;
 

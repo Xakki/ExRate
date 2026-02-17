@@ -15,10 +15,9 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class CnbProvider implements ProviderInterface
 {
-    public const URL = 'https://www.cnb.cz/cs/financni-trhy/devizovy-trh/kurzy-devizoveho-trhu/kurzy-devizoveho-trhu/denni_kurz.txt';
-
     public function __construct(
         private HttpClientInterface $httpClient,
+        private string $url,
         private int $id,
         private int $currencyPrecision,
     ) {
@@ -54,9 +53,14 @@ final readonly class CnbProvider implements ProviderInterface
         return 'Czech National Bank';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getDaysLag(): int
     {
-        $response = $this->httpClient->request('GET', self::URL, [
+        return 0;
+    }
+
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
+    {
+        $response = $this->httpClient->request('GET', $this->url, [
             'query' => [
                 'date' => $date->format('d.m.Y'),
             ],
@@ -118,5 +122,13 @@ final readonly class CnbProvider implements ProviderInterface
     public function getRequestDelay(): int
     {
         return 2;
+    }
+
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
+    {
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

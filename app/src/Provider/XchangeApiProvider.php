@@ -8,7 +8,10 @@ use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
 use App\Enum\ProviderEnum;
 use App\Exception\DisabledProviderException;
+use App\Exception\FailedProviderException;
 use App\Util\BcMath;
+use App\Util\RequestTrait;
+use App\Util\UrlTemplateTrait;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -16,10 +19,12 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class XchangeApiProvider implements ProviderInterface
 {
-    public const string LATEST_URL = 'https://api.xchangeapi.com/latest?base=USD';
+    use UrlTemplateTrait;
+    use RequestTrait;
 
     public function __construct(
         private HttpClientInterface $httpClient,
+        private string $url,
         private string $apiKey,
         private int $id,
         private int $currencyPrecision,
@@ -64,19 +69,18 @@ final readonly class XchangeApiProvider implements ProviderInterface
         return 'Live updated foreign exchange rates with fast and comfortable API.';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getDaysLag(): int
     {
-        $response = $this->httpClient->request('GET', self::LATEST_URL, [
-            'query' => [
-                'api-key' => $this->apiKey,
-            ],
-        ]);
+        return 0;
+    }
 
-        $content = $response->getContent();
-        $data = json_decode($content, true);
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
+    {
+        $url = $this->prepareUrl($this->url, $date, $this->getBaseCurrency(), apiKey: $this->apiKey);
+        $data = $this->jsonRequest($url);
 
-        if (!is_array($data) || isset($data['message'])) {
-            throw new \RuntimeException($data['message'] ?? 'Failed to parse XchangeApi response');
+        if (isset($data['message'])) {
+            throw new FailedProviderException((string) $data['message']);
         }
 
         $responseDate = (new \DateTimeImmutable(timezone: new \DateTimeZone('UTC')))->setTimestamp($data['timestamp']);
@@ -107,5 +111,13 @@ final readonly class XchangeApiProvider implements ProviderInterface
     public function getRequestDelay(): int
     {
         return 2;
+    }
+
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
+    {
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

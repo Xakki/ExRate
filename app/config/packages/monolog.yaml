@@ -5,7 +5,7 @@ monolog:
         file_log:
             type: stream
             path: "%monolog.handlers.file_log.path%"
-            level: notice
+            level: info
         console:
             type:   console
             process_psr_3_messages: false

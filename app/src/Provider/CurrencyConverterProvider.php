@@ -9,6 +9,7 @@ use App\DTO\GetRatesResult;
 use App\Enum\ProviderEnum;
 use App\Exception\DisabledProviderException;
 use App\Util\BcMath;
+use App\Util\RequestTrait;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -16,10 +17,11 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class CurrencyConverterProvider implements ProviderInterface
 {
-    public const string URL = 'https://free.currconv.com/api/v7/convert';
+    use RequestTrait;
 
     public function __construct(
         private HttpClientInterface $httpClient,
+        private string $url,
         private string $apiKey,
         private int $id,
         private int $currencyPrecision,
@@ -64,25 +66,23 @@ final readonly class CurrencyConverterProvider implements ProviderInterface
         return 'Free Currency Converter API';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getDaysLag(): int
+    {
+        return 0;
+    }
+
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
     {
         // This provider requires specific pairs too.
         $pairs = 'USD_EUR,USD_GBP,USD_JPY,USD_RUB';
 
-        $response = $this->httpClient->request('GET', self::URL, [
+        $data = $this->jsonRequest($this->url, options: [
             'query' => [
                 'apiKey' => $this->apiKey,
                 'q' => $pairs,
                 'compact' => 'ultra',
             ],
         ]);
-
-        $content = $response->getContent();
-        $data = json_decode($content, true);
-
-        if (!is_array($data)) {
-            throw new \RuntimeException('Failed to parse CurrencyConverter response');
-        }
 
         $rates = [];
         foreach ($data as $pair => $value) {
@@ -111,5 +111,13 @@ final readonly class CurrencyConverterProvider implements ProviderInterface
     public function getRequestDelay(): int
     {
         return 2;
+    }
+
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
+    {
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

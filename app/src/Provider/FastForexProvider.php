@@ -8,7 +8,9 @@ use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
 use App\Enum\ProviderEnum;
 use App\Exception\DisabledProviderException;
+use App\Exception\FailedProviderException;
 use App\Util\BcMath;
+use App\Util\RequestTrait;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -16,10 +18,11 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class FastForexProvider implements ProviderInterface
 {
-    public const string LATEST_URL = 'https://api.fastforex.io/fetch-all?from=USD';
+    use RequestTrait;
 
     public function __construct(
         private HttpClientInterface $httpClient,
+        private string $url,
         private string $apiKey,
         private int $id,
         private int $currencyPrecision,
@@ -64,20 +67,23 @@ final readonly class FastForexProvider implements ProviderInterface
         return 'Exchange rate API | Forex API | Currency API is very fast. Currency Exchange API for 160+ world currencies | OHLC | Bid/Ask | WebSockets | MCP Server';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getDaysLag(): int
+    {
+        return 0;
+    }
+
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
     {
         // FastForex free plan mostly supports latest rates.
-        $response = $this->httpClient->request('GET', self::LATEST_URL, [
+        $url = rtrim($this->url, '/').'/fetch-all?from=USD';
+        $data = $this->jsonRequest($url, options: [
             'query' => [
                 'api_key' => $this->apiKey,
             ],
         ]);
 
-        $content = $response->getContent();
-        $data = json_decode($content, true);
-
-        if (!is_array($data) || isset($data['error'])) {
-            throw new \RuntimeException($data['error'] ?? 'Failed to parse FastForex response');
+        if (isset($data['error'])) {
+            throw new FailedProviderException((string) $data['error']);
         }
 
         $responseDate = new \DateTimeImmutable($data['updated'] ?? 'now');
@@ -108,5 +114,13 @@ final readonly class FastForexProvider implements ProviderInterface
     public function getRequestDelay(): int
     {
         return 2;
+    }
+
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
+    {
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

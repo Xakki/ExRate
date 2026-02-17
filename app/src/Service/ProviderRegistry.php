@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Contract\ProviderInterface;
-use App\DTO\ProviderDTO;
+use App\DTO\Provider;
 use App\Enum\ProviderEnum;
 use App\Exception\DisabledProviderException;
+use App\Repository\ExchangeRateRepository;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutowireLocator;
@@ -23,6 +24,7 @@ readonly class ProviderRegistry
         private ContainerInterface $locator,
         private CacheInterface $fastCache,
         private LoggerInterface $logger,
+        private ExchangeRateRepository $exchangeRateRepository,
     ) {
     }
 
@@ -45,7 +47,7 @@ readonly class ProviderRegistry
     }
 
     /**
-     * @return ProviderDTO[]
+     * @return Provider[]
      */
     public function getAll(bool $force = false): array
     {
@@ -54,7 +56,7 @@ readonly class ProviderRegistry
         }
 
         return $this->fastCache->get(self::CACHE_KEY, function (ItemInterface $item) {
-            // $item->expiresAfter(3600);
+            $item->expiresAfter(3600);
             $providers = [];
             foreach (ProviderEnum::cases() as $providerEnum) {
                 try {
@@ -63,12 +65,13 @@ readonly class ProviderRegistry
                     $this->logger->info($e->getMessage(), ['provider' => $providerEnum->value]);
                     continue;
                 }
-                $providers[] = new ProviderDTO(
+                $providers[] = new Provider(
                     $provider->getEnum()->value,
                     $provider->getHomePage(),
                     $provider->getDescription(),
-                    $provider->getAvailableCurrencies(),
                     $provider->getBaseCurrency(),
+                    $provider->getAvailableCurrencies(),
+                    $this->exchangeRateRepository->getMinDate($provider->getId())?->format('Y-m-d')
                 );
             }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\DTO;
 
 use App\Enum\ProviderEnum;
+use App\Validator\Constraints\MinDate;
 use OpenApi\Attributes as OA;
 use Symfony\Component\Serializer\Attribute\Ignore;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -20,17 +21,17 @@ class RateRequest
     public ?string $date = null;
 
     #[Assert\NotBlank]
-    #[Assert\Currency]
-    #[OA\Property(description: 'Target currency code (ISO 4217)', maxLength: 3, minLength: 3, example: 'USD')]
+    #[Assert\Length(min: 2, max: 10)]
+    #[OA\Property(description: 'Target currency code', maxLength: 10, minLength: 2, example: 'USD')]
     public string $currency = '';
 
-    #[Assert\Currency]
-    #[OA\Property(description: 'Base currency code (ISO 4217)', maxLength: 3, minLength: 3, example: 'RUB')]
-    public string $baseCurrency = 'RUB';
+    #[Assert\Length(min: 2, max: 10)]
+    #[OA\Property(description: 'Base currency code', maxLength: 10, minLength: 2, example: 'EUR')]
+    public string $baseCurrency = 'EUR';
 
     #[Assert\Choice(callback: [ProviderEnum::class, 'cases'])]
-    #[OA\Property(description: 'Data provider', type: 'string', enum: [ProviderEnum::CBR])]
-    public ProviderEnum $provider = ProviderEnum::CBR;
+    #[OA\Property(description: 'Data provider', type: 'string', enum: [ProviderEnum::ECB])]
+    public ProviderEnum $provider = ProviderEnum::ECB;
 
     #[Assert\Callback]
     public function validateDateRange(ExecutionContextInterface $context): void
@@ -45,17 +46,15 @@ class RateRequest
             return;
         }
 
-        $date = $date->setTime(0, 0);
-        $min = new \DateTimeImmutable('1993-01-29');
+        // Validate min date using custom constraint that has access to the repository
+        $context->getValidator()
+            ->inContext($context)
+            ->atPath('date')
+            ->validate($this->date, new MinDate(provider: $this->provider));
+
         $max = new \DateTimeImmutable('today');
 
-        if ($date < $min) {
-            $context->buildViolation('Date must be greater than or equal to 1993-01-29.')
-                ->atPath('date')
-                ->addViolation();
-        }
-
-        if ($date > $max) {
+        if ($date->diff($max)->invert) {
             $context->buildViolation('Date must be less than or equal to today.')
                 ->atPath('date')
                 ->addViolation();

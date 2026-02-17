@@ -8,7 +8,9 @@ use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
 use App\Enum\ProviderEnum;
 use App\Exception\DisabledProviderException;
+use App\Exception\FailedProviderException;
 use App\Util\BcMath;
+use App\Util\RequestTrait;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -16,11 +18,11 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class ExchangeRatesApiProvider implements ProviderInterface
 {
-    public const string LATEST_URL = 'http://api.exchangeratesapi.io/v1/latest';
-    public const string HISTORICAL_URL = 'http://api.exchangeratesapi.io/v1/%s';
+    use RequestTrait;
 
     public function __construct(
         private HttpClientInterface $httpClient,
+        private string $url,
         private string $accessKey,
         private int $id,
         private int $currencyPrecision,
@@ -65,22 +67,25 @@ final readonly class ExchangeRatesApiProvider implements ProviderInterface
         return 'Access accurate exchange rate data with ExchangeRatesAPI. Our free API provides reliable rates for 170+ currencies, updated every 60 minutes. Get started now!';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getDaysLag(): int
+    {
+        return 0;
+    }
+
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
     {
         $isToday = $date->format('Y-m-d') === (new \DateTimeImmutable())->format('Y-m-d');
-        $url = $isToday ? self::LATEST_URL : sprintf(self::HISTORICAL_URL, $date->format('Y-m-d'));
+        $baseUrl = rtrim($this->url, '/');
+        $url = $isToday ? $baseUrl.'/latest' : sprintf($baseUrl.'/%s', $date->format('Y-m-d'));
 
-        $response = $this->httpClient->request('GET', $url, [
+        $data = $this->jsonRequest($url, options: [
             'query' => [
                 'access_key' => $this->accessKey,
             ],
         ]);
 
-        $content = $response->getContent();
-        $data = json_decode($content, true);
-
-        if (!is_array($data) || (isset($data['success']) && !$data['success'])) {
-            throw new \RuntimeException($data['error']['message'] ?? 'Failed to parse ExchangeRatesApi response');
+        if (isset($data['success']) && !$data['success']) {
+            throw new FailedProviderException($data['error']['message'] ?? 'Failed to parse ExchangeRatesApi response');
         }
 
         $responseDate = new \DateTimeImmutable($data['date']);
@@ -111,5 +116,13 @@ final readonly class ExchangeRatesApiProvider implements ProviderInterface
     public function getRequestDelay(): int
     {
         return 2;
+    }
+
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
+    {
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

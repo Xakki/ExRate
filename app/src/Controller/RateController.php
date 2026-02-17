@@ -87,7 +87,7 @@ class RateController extends AbstractController
                 $request->provider
             );
             $headers = [];
-            if (null === $response->diff) {
+            if (!$response->isFullData()) {
                 $status = 202;
                 $headers = $headerRetry;
             }
@@ -95,7 +95,7 @@ class RateController extends AbstractController
             return $this->json($response, $status, $headers);
         } catch (RateNotFoundException) {
             return $this->json(
-                new RateResponse('', null, '', null),
+                new RateResponse('', '', null, null),
                 202,
                 $headerRetry
             );

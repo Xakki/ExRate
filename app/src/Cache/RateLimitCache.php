@@ -64,4 +64,25 @@ final readonly class RateLimitCache implements RateLimitCacheInterface
         // В данном проекте используется префиксный кеш,
         // но для простоты мы просто не будем очищать старые окна, они сами умрут по TTL
     }
+
+    public function block(ProviderEnum $providerEnum, int $seconds): void
+    {
+        $key = sprintf('rate_limit_block_%s', $providerEnum->value);
+        $item = $this->cacheItemPool->getItem($key);
+        $item->set(time() + $seconds);
+        $item->expiresAfter($seconds);
+        $this->cacheItemPool->save($item);
+    }
+
+    public function getBlockedUntil(ProviderEnum $providerEnum): ?int
+    {
+        $key = sprintf('rate_limit_block_%s', $providerEnum->value);
+        $item = $this->cacheItemPool->getItem($key);
+
+        if (!$item->isHit()) {
+            return null;
+        }
+
+        return (int) $item->get();
+    }
 }

@@ -39,7 +39,7 @@ class FetchRateHandler
         if ($this->logger instanceof \Monolog\Logger) {
             $processor = function (\Monolog\LogRecord $record) use ($message): \Monolog\LogRecord {
                 return $record->with(context: array_merge($record->context, [
-                    'provider' => $message->provider->value,
+                    'provider' => $message->providerEnum->value,
                     'date' => $message->date,
                 ]));
             };
@@ -48,13 +48,13 @@ class FetchRateHandler
 
         try {
             // $this->logger->info('---RUN---:', ['date' => $message->date->format('Y-m-d')]);
-            $provider = $this->providerRegistry->get($message->provider);
-            [$status, $correctedDate] = $this->importer->fetchAndSaveRates($message->provider, $message->date);
+            $provider = $this->providerRegistry->get($message->providerEnum);
+            [$status, $correctedDate] = $this->importer->fetchAndSaveRates($message->providerEnum, $message->date);
             if ($message->loadPrevious) {
                 $noRate = 0;
-                if (FetchStatusEnum::NO_MORE === $status) {
+                if (FetchStatusEnum::EMPTY === $status) {
                     if ($message->noRate > 10) {
-                        $this->logger->info('No more rates available for :'.$message->provider->value);
+                        $this->logger->info('No more rates available for :'.$message->providerEnum->value);
 
                         return;
                     }
@@ -66,11 +66,13 @@ class FetchRateHandler
                     // Если данные были получены, выполняем загрузку предыдущего дня с задержкой в секунду
                     $delaySecund = $provider->getRequestDelay();
                 }
+
                 $dateNext = $message->date->modify('-1 day');
-                if ($correctedDate < $dateNext) {
+                if ($correctedDate->diff($dateNext)->d) {
                     $dateNext = $correctedDate;
                 }
-                $messageNext = new FetchRateMessage($dateNext, $message->provider, --$message->loadPrevious, $noRate);
+
+                $messageNext = new FetchRateMessage($dateNext, $message->providerEnum, --$message->loadPrevious, $noRate);
                 // $this->logger->info('---NEXT---:', ['date' => $dateNext->format('Y-m-d')]);
                 $this->bus->dispatch($messageNext, $messageNext->getStamps($delaySecund, $this->rateLimitCache, $provider));
             }

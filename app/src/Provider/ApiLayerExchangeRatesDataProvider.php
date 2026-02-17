@@ -8,7 +8,10 @@ use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
 use App\Enum\ProviderEnum;
 use App\Exception\DisabledProviderException;
+use App\Exception\FailedProviderException;
 use App\Util\BcMath;
+use App\Util\RequestTrait;
+use App\Util\UrlTemplateTrait;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -16,10 +19,12 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class ApiLayerExchangeRatesDataProvider implements ProviderInterface
 {
-    public const string HISTORICAL_URL = 'https://api.apilayer.com/exchangerates_data/%s?base=%s';
+    use UrlTemplateTrait;
+    use RequestTrait;
 
     public function __construct(
         private HttpClientInterface $httpClient,
+        private string $url,
         private string $apiKey,
         private int $id,
         private int $currencyPrecision,
@@ -64,31 +69,9 @@ final readonly class ApiLayerExchangeRatesDataProvider implements ProviderInterf
         return 'APILayer APIs are feature-rich and easy to integrate, offering low latency for an enhanced developer experience.';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getDaysLag(): int
     {
-        $url = sprintf(self::HISTORICAL_URL, $date->format('Y-m-d'), $this->getBaseCurrency());
-
-        $response = $this->httpClient->request('GET', $url, [
-            'headers' => [
-                'apikey' => $this->apiKey,
-            ],
-        ]);
-
-        $content = $response->getContent();
-        $data = json_decode($content, true);
-
-        if (!is_array($data) || (isset($data['success']) && !$data['success'])) {
-            throw new \RuntimeException($data['error']['info'] ?? 'Failed to parse ApiLayer Exchange Rates Data response');
-        }
-
-        $responseDate = new \DateTimeImmutable($data['date']);
-        $rates = [];
-
-        foreach ($data['rates'] as $code => $value) {
-            $rates[$code] = BcMath::round((string) $value, $this->currencyPrecision);
-        }
-
-        return new GetRatesResult($this->getId(), $this->getBaseCurrency(), $responseDate, $rates);
+        return 0;
     }
 
     public function getAvailableCurrencies(): array
@@ -109,5 +92,35 @@ final readonly class ApiLayerExchangeRatesDataProvider implements ProviderInterf
     public function getRequestDelay(): int
     {
         return 2;
+    }
+
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
+    {
+        $url = $this->prepareUrl($this->url, $date, $this->getBaseCurrency(), apiKey: $this->apiKey);
+
+        $data = $this->jsonRequest($url, [
+            'apikey' => $this->apiKey,
+        ]);
+
+        if (isset($data['success']) && !$data['success']) {
+            throw new FailedProviderException($data['error']['info'] ?? 'Failed to parse ApiLayer Exchange Rates Data response');
+        }
+
+        $responseDate = new \DateTimeImmutable($data['date']);
+        $rates = [];
+
+        foreach ($data['rates'] as $code => $value) {
+            $rates[$code] = BcMath::round((string) $value, $this->currencyPrecision);
+        }
+
+        return new GetRatesResult($this->getId(), $this->getBaseCurrency(), $responseDate, $rates);
+    }
+
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
+    {
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

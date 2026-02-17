@@ -15,7 +15,7 @@ class FetchRateMessage
 {
     public function __construct(
         public \DateTimeImmutable $date,
-        public ProviderEnum $provider = ProviderEnum::CBR,
+        public ProviderEnum $providerEnum,
         public int $loadPrevious = 0,
         public int $noRate = 0,
         public int $retryCount = 0,
@@ -25,9 +25,8 @@ class FetchRateMessage
     public function getUniqueId(): string
     {
         return sprintf(
-            'fetch-rate-%s-%s',
-            $this->date->format('Y-m-d'),
-            $this->provider->value
+            'fetch-rate-%s',
+            $this->providerEnum->value
         );
     }
 
@@ -39,7 +38,7 @@ class FetchRateMessage
         if ($cache && $provider && $provider->getRequestLimit() > 0) {
             $limit = $provider->getRequestLimit();
             $period = $provider->getRequestLimitPeriod();
-            $currentCount = $cache->getCount($this->provider, $period);
+            $currentCount = $cache->getCount($this->providerEnum, $period);
 
             if ($currentCount >= ($limit - 10)) {
                 // Если мы близки к лимиту, добавляем задержку.

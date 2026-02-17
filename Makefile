@@ -78,7 +78,7 @@ migrate: ## Run migrations
 	$(composer) test:migrate
 
 load-rates: ## Load rates from 180 last days
-	@make console cmd="app:fetch-history --days=180 --provider=$(provider)" --no-print-directory
+	@make console cmd="app:fetch-history --days=3600 --provider=$(provider)" --no-print-directory
 
 queue-run: ## manual Run Queue
 	@make console cmd="messenger:consume async -vv" --no-print-directory

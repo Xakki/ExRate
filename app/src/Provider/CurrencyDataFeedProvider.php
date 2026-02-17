@@ -8,7 +8,9 @@ use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
 use App\Enum\ProviderEnum;
 use App\Exception\DisabledProviderException;
+use App\Exception\FailedProviderException;
 use App\Util\BcMath;
+use App\Util\RequestTrait;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -16,10 +18,11 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class CurrencyDataFeedProvider implements ProviderInterface
 {
-    public const string URL = 'https://currencydatafeed.com/api/data.php';
+    use RequestTrait;
 
     public function __construct(
         private HttpClientInterface $httpClient,
+        private string $url,
         private string $token,
         private int $id,
         private int $currencyPrecision,
@@ -64,20 +67,22 @@ final readonly class CurrencyDataFeedProvider implements ProviderInterface
         return 'Currency API delivering real-time FX & crypto rates, historical data and a powerful currency converter. Simple REST & WebSocket endpoints since 2015.';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getDaysLag(): int
     {
-        $response = $this->httpClient->request('GET', self::URL, [
+        return 0;
+    }
+
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
+    {
+        $data = $this->jsonRequest($this->url, options: [
             'query' => [
                 'token' => $this->token,
                 'currency' => 'USD/EUR,USD/GBP,USD/JPY,USD/RUB', // Example
             ],
         ]);
 
-        $content = $response->getContent();
-        $data = json_decode($content, true);
-
-        if (!is_array($data) || !$data['status']) {
-            throw new \RuntimeException('Failed to parse CurrencyDataFeed response');
+        if (!$data['status']) {
+            throw new FailedProviderException('Failed to parse CurrencyDataFeed response');
         }
 
         $rates = [];
@@ -111,5 +116,13 @@ final readonly class CurrencyDataFeedProvider implements ProviderInterface
     public function getRequestDelay(): int
     {
         return 2;
+    }
+
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
+    {
+        throw new \App\Exception\NotAvailableMethod();
     }
 }

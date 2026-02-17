@@ -8,7 +8,9 @@ use App\Contract\ProviderInterface;
 use App\DTO\GetRatesResult;
 use App\Enum\ProviderEnum;
 use App\Exception\DisabledProviderException;
+use App\Exception\FailedProviderException;
 use App\Util\BcMath;
+use App\Util\RequestTrait;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -16,10 +18,11 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final readonly class XigniteProvider implements ProviderInterface
 {
-    public const string LATEST_URL = 'https://globalcurrencies.xignite.com/xGlobalCurrencies.json/GetRealTimeRates?Symbols=USDEUR,USDGBP,USDJPY,USDRUB&_fields=Outcome,Message,Symbol,Date,Time,Bid';
+    use RequestTrait;
 
     public function __construct(
         private HttpClientInterface $httpClient,
+        private string $url,
         private string $token,
         private int $id,
         private int $currencyPrecision,
@@ -64,19 +67,22 @@ final readonly class XigniteProvider implements ProviderInterface
         return 'QUODD is a global market data provider delivering tailor-made data products on demand. Access anytime, anywhere with flexible formats and pricing models.';
     }
 
-    public function getRates(\DateTimeImmutable $date): GetRatesResult
+    public function getDaysLag(): int
     {
-        $response = $this->httpClient->request('GET', self::LATEST_URL, [
+        return 0;
+    }
+
+    public function getRatesByDate(\DateTimeImmutable $date): GetRatesResult
+    {
+        $url = rtrim($this->url, '/').'/GetRealTimeRates?Symbols=USDEUR,USDGBP,USDJPY,USDRUB&_fields=Outcome,Message,Symbol,Date,Time,Bid';
+        $data = $this->jsonRequest($url, options: [
             'query' => [
                 '_Token' => $this->token,
             ],
         ]);
 
-        $content = $response->getContent();
-        $data = json_decode($content, true);
-
-        if (!is_array($data) || 'Success' !== $data[0]['Outcome']) {
-            throw new \RuntimeException($data[0]['Message'] ?? 'Failed to parse Xignite response');
+        if ('Success' !== $data[0]['Outcome']) {
+            throw new FailedProviderException($data[0]['Message'] ?? 'Failed to parse Xignite response');
         }
 
         $rates = [];
@@ -110,5 +116,13 @@ final readonly class XigniteProvider implements ProviderInterface
     public function getRequestDelay(): int
     {
         return 2;
+    }
+
+    /**
+     * @return GetRatesResult[]
+     */
+    public function getRatesByRangeDate(\DateTimeImmutable $start, \DateTimeImmutable $end): array
+    {
+        throw new \App\Exception\NotAvailableMethod();
     }
 }
