@@ -3,3 +3,5 @@
 /.env
 .DS_Store
 /.ai/
+.claude/settings.local.json
+CLAUDE.local.md
