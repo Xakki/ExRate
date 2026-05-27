@@ -143,32 +143,7 @@ abstract readonly class AbstractProviderRate implements ProviderRateInterface
                     $retryAfter = $headers['retry-after'][0] ?? $headers['ratelimit-reset'][0] ?? 86400;
                     throw new LimitException((int) $retryAfter);
                 }
-                if ('prod' !== getenv('APP_ENV')) {
-                    echo PHP_EOL.'<<<TODO: разобраться с этим кейсом: '.PHP_EOL;
-                    echo PHP_EOL.'Response code : '.$e->getResponse()->getStatusCode().PHP_EOL;
-                    echo 'Headers: '.PHP_EOL;
-                    print_r($headers);
-                    echo 'Response: '.PHP_EOL;
-                    print_r($content);
-                    print_r(PHP_EOL);
-                }
-            } else {
-                if ('prod' !== getenv('APP_ENV')) {
-                    echo PHP_EOL.'<<<TODO: разобраться с этим кейсом: '.PHP_EOL;
-                }
             }
-            if ('prod' !== getenv('APP_ENV')) {
-                print_r(PHP_EOL);
-                print_r(PHP_EOL);
-                print_r($e::class);
-                print_r(PHP_EOL);
-                print_r($e->getMessage());
-                print_r(PHP_EOL);
-                print_r(PHP_EOL);
-                print_r($e->getTraceAsString());
-                print_r(PHP_EOL);
-            }
-            throw new \Exception('TODO>>>', 0, $e);
         }
 
         $this->logRequest($url, $response);
