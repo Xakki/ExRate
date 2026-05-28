@@ -13,6 +13,8 @@ use Psr\Cache\CacheItemPoolInterface;
 final readonly class RateCache implements RateCacheInterface
 {
     private const string CACHE_KEY = 'rate_%s_%s_%s_%s';
+    private const int FRESH_DAYS = 5;
+    private const int FRESH_TTL_SECONDS = 86400;
 
     public function __construct(private CacheItemPoolInterface $cacheItemPool)
     {
@@ -37,7 +39,12 @@ final readonly class RateCache implements RateCacheInterface
 
         $item = $this->cacheItemPool->getItem($key);
         $item->set($rateResponse);
-        // $item->expiresAfter(0);
+
+        // Свежие даты: TTL сутки (провайдер ещё может дозалить данные)
+        // Старше FRESH_DAYS: бессрочно (исторические курсы не меняются)
+        if (Date::getDayDiff($date) <= self::FRESH_DAYS) {
+            $item->expiresAfter(self::FRESH_TTL_SECONDS);
+        }
 
         $this->cacheItemPool->save($item);
     }

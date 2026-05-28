@@ -7,6 +7,8 @@ namespace App\Command;
 use App\Contract\ProviderRateInterface;
 use App\Exception\DisabledProviderException;
 use App\Service\ProviderRegistry;
+use App\Util\CryptoCurrencies;
+use App\Util\Currencies;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -85,6 +87,8 @@ class SyncProviderCurrenciesCommand extends Command
         return Command::SUCCESS;
     }
 
+    private const int CODES_PER_LINE = 6;
+
     /**
      * @param string[] $currencies
      */
@@ -102,10 +106,8 @@ class SyncProviderCurrenciesCommand extends Command
             return false;
         }
 
-        // Format the array nicely
-        $formattedArray = "['".implode("', '", $currencies)."']";
+        $formattedArray = $this->formatCurrencyArray($currencies);
 
-        // Match the method body. We assume the standard format implemented earlier.
         $pattern = '/public function getAvailableCurrencies\(\): array\s*\{[^}]+\}/s';
         $replacement = sprintf(
             "public function getAvailableCurrencies(): array\n    {\n        return %s;\n    }",
@@ -119,5 +121,37 @@ class SyncProviderCurrenciesCommand extends Command
         }
 
         return false;
+    }
+
+    /**
+     * @param string[] $currencies
+     */
+    private function formatCurrencyArray(array $currencies): string
+    {
+        $refs = array_map($this->resolveConstant(...), $currencies);
+
+        if (count($refs) <= self::CODES_PER_LINE) {
+            return '['.implode(', ', $refs).']';
+        }
+
+        $lines = [];
+        foreach (array_chunk($refs, self::CODES_PER_LINE) as $chunk) {
+            $lines[] = '            '.implode(', ', $chunk).',';
+        }
+
+        return "[\n".implode("\n", $lines)."\n        ]";
+    }
+
+    private function resolveConstant(string $code): string
+    {
+        if (defined(Currencies::class.'::'.$code)) {
+            return 'Currencies::'.$code;
+        }
+
+        if (defined(CryptoCurrencies::class.'::'.$code)) {
+            return 'CryptoCurrencies::'.$code;
+        }
+
+        return "'".$code."'";
     }
 }

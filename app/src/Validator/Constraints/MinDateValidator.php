@@ -33,15 +33,15 @@ class MinDateValidator extends ConstraintValidator
         try {
             $date = Date::createFromFormat(Date::FORMAT, (string) $value);
         } catch (\App\Exception\BadDateException) {
-            // TODO: log notice
+            // Assert\Date уже отрапортует 400 — дублировать не нужно.
             return;
         }
 
-        $provider = null;
-        if ($constraint->provider instanceof ProviderEnum) {
-            $provider = $this->providerRegistry->get($constraint->provider);
+        if (!$constraint->provider instanceof ProviderEnum) {
+            throw new \LogicException(sprintf('Constraint %s requires a non-null provider', MinDate::class));
         }
 
+        $provider = $this->providerRegistry->get($constraint->provider);
         $minDateEntity = $this->exchangeRateRepository->getMinDate($provider);
         $min = $minDateEntity ?? new \DateTimeImmutable('2009-04-28');
 

@@ -98,8 +98,8 @@ curl "http://localhost/api/v1/rate?date=2026-02-09&currency=USD"
 ```json
 {
     "rate":"1.03450000",
-    "diff":"-0.0012",
-    "dateDiff":"2026-02-06",
+    "rate_diff":"-0.0012",
+    "date_diff":"2026-02-06",
     "date":"2026-02-09",
     "timestamp":"2026-02-09T21:51:29+03:00"
 }

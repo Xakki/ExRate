@@ -33,11 +33,6 @@ final readonly class ForgeProvider extends AbstractProviderRate
         }
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.forge';
-    }
-
     public function isActive(): bool
     {
         return !empty($this->apiKey);

@@ -45,7 +45,7 @@ class RateRequest
         try {
             $date = Date::createFromFormat(Date::FORMAT, $this->date);
         } catch (\App\Exception\BadDateException) {
-            // TODO: log notice
+            // Assert\Date уже отрапортует 400 — дублировать не нужно.
             return;
         }
 
@@ -74,7 +74,7 @@ class RateRequest
         try {
             return Date::createFromFormat(Date::FORMAT, $this->date);
         } catch (\App\Exception\BadDateException) {
-            // TODO: log notice
+            // Assert\Date уже валидирует формат, тут безопасный fallback.
             return new \DateTimeImmutable('today');
         }
     }

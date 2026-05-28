@@ -18,22 +18,14 @@ framework:
                     - cache.adapter.apcu
                     - cache.adapter.redis
                 default_lifetime: 86400
-            first_cache:
+            rate_cache:
                 adapter: app.cache.default
                 default_lifetime: 0
                 provider: '%env(REDIS_URL)%/1'
-            second_cache:
-                adapter: app.cache.default
-                default_lifetime: 0
-                provider: '%env(REDIS_URL)%/2'
-            third_cache:
+            timeseries_cache:
                 adapter: app.cache.default
                 default_lifetime: 0
                 provider: '%env(REDIS_URL)%/3'
-            fourth_cache:
-                adapter: app.cache.default
-                default_lifetime: 0
-                provider: '%env(REDIS_URL)%/4'
             ## Example cache: with namespace (Dont touch)
             #example_cache:
             #    adapter: app.cache.adapter.example_cache

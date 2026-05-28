@@ -83,7 +83,10 @@ class FetchRateHandler
                 $this->logger->info('!!! Queue done:'.$message->providerEnum->value);
             }
         } catch (DisabledProviderException $e) {
-            // skip
+            $this->logger->info('Drop fetch message: provider disabled', [
+                'provider' => $message->providerEnum->value,
+                'reason' => $e->getMessage(),
+            ]);
         } catch (RetryByDateException $e) {
             $loadPrevious = max(0, $message->loadPrevious);
             $messageNext = new FetchRateMessage($e->availableDate, $message->providerEnum, $loadPrevious, $message->noRate + 1);
@@ -134,14 +137,20 @@ class FetchRateHandler
 
             if (isset($retries[$message->retryCount])) {
                 $delayMinutes = $retries[$message->retryCount] * $delayMinutes;
-                ++$message->retryCount;
+                $nextRetry = new FetchRateMessage(
+                    $message->date,
+                    $message->providerEnum,
+                    $message->loadPrevious,
+                    $message->noRate,
+                    $message->retryCount + 1,
+                );
 
                 $this->logger->info('Retrying message in {delay} minutes (attempt {attempt})', [
                     'delay' => $delayMinutes,
-                    'attempt' => $message->retryCount,
+                    'attempt' => $nextRetry->retryCount,
                 ]);
 
-                $this->bus->dispatch($message, [
+                $this->bus->dispatch($nextRetry, [
                     new DelayStamp($delayMinutes * 60000),
                 ]);
             } else {

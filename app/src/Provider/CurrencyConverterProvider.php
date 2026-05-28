@@ -33,11 +33,6 @@ final readonly class CurrencyConverterProvider extends AbstractProviderRate
         }
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.currency_converter';
-    }
-
     public function isActive(): bool
     {
         return !empty($this->apiKey);

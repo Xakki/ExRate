@@ -37,11 +37,6 @@ final readonly class ApiLayerFixerProvider extends AbstractProviderRate
         }
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.api_layer_fixer';
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::API_LAYER_FIXER;

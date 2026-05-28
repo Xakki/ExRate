@@ -7,7 +7,11 @@ namespace App\Util;
 final class BcMath
 {
     /**
+     * Caller must ensure $right is not zero. PHP 8.x bcdiv() throws \DivisionByZeroError on zero divisor.
+     *
      * @return numeric-string
+     *
+     * @throws \DivisionByZeroError when $right normalizes to zero
      */
     public static function div(string|int|float $left, string|int|float $right, int $scale): string
     {

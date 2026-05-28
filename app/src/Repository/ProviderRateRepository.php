@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Repository;
 
-use App\Contract\ProviderRateExtendInterface;
 use App\Contract\ProviderRateInterface;
 use App\Contract\RateEntityInterface;
 use App\Contract\RateRepositoryInterface;
+use App\DTO\RateExtendData;
 
 final readonly class ProviderRateRepository implements RateRepositoryInterface
 {
@@ -71,7 +71,7 @@ final readonly class ProviderRateRepository implements RateRepositoryInterface
 
     private function getRepository(ProviderRateInterface $provider): RateRepositoryInterface
     {
-        if ($provider instanceof ProviderRateExtendInterface) {
+        if (RateExtendData::class === $provider->getDataClass()) {
             return $this->rateExtendRepository;
         }
 

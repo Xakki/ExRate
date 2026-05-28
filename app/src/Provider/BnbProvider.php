@@ -29,11 +29,6 @@ final readonly class BnbProvider extends AbstractProviderRate
     ) {
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.bnb';
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::BNB;
@@ -85,8 +80,12 @@ final readonly class BnbProvider extends AbstractProviderRate
             if (!$responseDate) {
                 try {
                     $responseDate = Date::createFromFormat('d.m.Y', (string) $row->CURR_DATE);
-                } catch (\App\Exception\BadDateException) {
-                    // TODO: log notice
+                } catch (\App\Exception\BadDateException $e) {
+                    $this->logger->notice('Failed to parse date from provider response', [
+                        'provider' => $this->getEnum()->value,
+                        'raw' => (string) $row->CURR_DATE,
+                        'error' => $e->getMessage(),
+                    ]);
                     $responseDate = $date;
                 }
             }

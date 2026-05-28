@@ -6,6 +6,7 @@ namespace App\Service;
 
 use App\Contract\ProviderRateInterface;
 use App\DTO\GetRatesResult;
+use App\DTO\RateData;
 use App\Exception\FailedProviderException;
 use App\Exception\LimitException;
 use App\Exception\NotAvailableMethod;
@@ -19,6 +20,7 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
 abstract readonly class AbstractProviderRate implements ProviderRateInterface
 {
     protected const int HTTP_CODE_RETRY = 429;
+    protected const int DEFAULT_REQUEST_DELAY_SECONDS = 2;
 
     public function __construct(
         protected readonly HttpClientInterface $httpClient,
@@ -49,7 +51,7 @@ abstract readonly class AbstractProviderRate implements ProviderRateInterface
 
     public function getRequestDelay(): int
     {
-        return 2;
+        return self::DEFAULT_REQUEST_DELAY_SECONDS;
     }
 
     public function getHistoryDaysLag(): int
@@ -60,6 +62,11 @@ abstract readonly class AbstractProviderRate implements ProviderRateInterface
     public function getPeriodDays(): int
     {
         return 60;
+    }
+
+    public function getDataClass(): string
+    {
+        return RateData::class;
     }
 
     public function getRatesToday(\DateTimeImmutable $date): GetRatesResult
@@ -121,29 +128,28 @@ abstract readonly class AbstractProviderRate implements ProviderRateInterface
             $response = $this->httpClient->request($method, $url, $options);
             $response->getContent(false);
             $response->getHeaders(false);
-        } catch (\Throwable $e) {
-            if ($e instanceof TransportExceptionInterface) {
-                if ($attempt > 3) {
-                    throw $e;
-                }
-                if ($e instanceof TimeoutExceptionInterface) {
-                    $options['timeout'] += 5;
-                }
-                if (str_contains($e->getMessage(), 'Could not resolve host:')) {
-                    $options['resolve'] = $this->getDnsResolveOptions($attempt);
-                }
-
-                return $this->request(url: $url, method: $method, options: $options, attempt: $attempt);
-            } elseif ($e instanceof HttpExceptionInterface) {
-                $headers = $e->getResponse()->getHeaders(false);
-                $content = $e->getResponse()->getContent(false);
-                $statusCode = $e->getResponse()->getStatusCode();
-
-                if (self::HTTP_CODE_RETRY === $statusCode) {
-                    $retryAfter = $headers['retry-after'][0] ?? $headers['ratelimit-reset'][0] ?? 86400;
-                    throw new LimitException((int) $retryAfter);
-                }
+        } catch (TransportExceptionInterface $e) {
+            if ($attempt > 3) {
+                throw $e;
             }
+            if ($e instanceof TimeoutExceptionInterface) {
+                $options['timeout'] += 5;
+            }
+            if (str_contains($e->getMessage(), 'Could not resolve host:')) {
+                $options['resolve'] = $this->getDnsResolveOptions($attempt);
+            }
+
+            return $this->request(url: $url, method: $method, options: $options, attempt: $attempt);
+        } catch (HttpExceptionInterface $e) {
+            $headers = $e->getResponse()->getHeaders(false);
+            $statusCode = $e->getResponse()->getStatusCode();
+
+            if (self::HTTP_CODE_RETRY === $statusCode) {
+                $retryAfter = $headers['retry-after'][0] ?? $headers['ratelimit-reset'][0] ?? 86400;
+                throw new LimitException((int) $retryAfter);
+            }
+
+            throw $e;
         }
 
         $this->logRequest($url, $response);
@@ -166,7 +172,7 @@ abstract readonly class AbstractProviderRate implements ProviderRateInterface
                 return;
             }
 
-            $logDir = 'var/log/requests';
+            $logDir = dirname(__DIR__, 2).'/var/log/requests';
             if (!is_dir($logDir)) {
                 mkdir($logDir, 0777, true);
             }

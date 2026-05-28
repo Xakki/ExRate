@@ -1,6 +1,6 @@
 {
     "name": "xakki/exrate",
-    "version": "0.1",
+    "version": "0.4",
     "type": "project",
     "description": "Exchange Rate Service",
     "license": "MIT",

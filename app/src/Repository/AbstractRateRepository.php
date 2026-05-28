@@ -35,10 +35,11 @@ abstract class AbstractRateRepository extends ServiceEntityRepository implements
             ->setParameter('baseCurrency', $baseCurrency)
             ->setParameter('maxDate', $maxDate->format(Date::FORMAT));
 
-        if ($minDate) {
-            $builder->andWhere('r.date >= :minDate')
-                ->setParameter('minDate', $minDate->format(Date::FORMAT));
+        if (empty($minDate)) {
+            $minDate = $maxDate->sub(new \DateInterval('P30D'));
         }
+        $builder->andWhere('r.date >= :minDate')
+            ->setParameter('minDate', $minDate->format(Date::FORMAT));
 
         return $builder->orderBy('r.date', 'DESC')
             ->setMaxResults(2)
@@ -134,6 +135,7 @@ abstract class AbstractRateRepository extends ServiceEntityRepository implements
         $columns = $this->getInsertColumns();
         $placeholders = $this->getInsertPlaceholders();
 
+        // MySQL/MariaDB only. Для PG нужен `INSERT ... ON CONFLICT DO NOTHING`.
         $baseQuery = 'INSERT IGNORE INTO '.$table.' (created_at, date, currency, base_currency, provider_id, '.implode(', ', $columns).') VALUES ';
 
         $config = $connection->getConfiguration();

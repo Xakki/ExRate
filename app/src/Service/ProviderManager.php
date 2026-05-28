@@ -84,8 +84,9 @@ readonly class ProviderManager
     private function groupRates(array $rates, FrequencyEnum $group): array
     {
         $grouped = [];
+        $utc = new \DateTimeZone('UTC');
         foreach ($rates as $date => $rate) {
-            $dt = new \DateTimeImmutable($date);
+            $dt = new \DateTimeImmutable($date, $utc);
             if (FrequencyEnum::Weekly === $group) {
                 $key = $dt->modify('monday this week')->format(Date::FORMAT);
             } elseif (FrequencyEnum::Monthly === $group) {
@@ -141,10 +142,9 @@ readonly class ProviderManager
 
     private function calculateCrossRate(ProviderRateInterface $provider, \DateTimeImmutable $date, string $currency, string $baseCurrency): RateResponse
     {
-        $providerBaseCurrency = $provider->getBaseCurrency();
-
-        $targetTo = $this->getRate($date, $currency, $providerBaseCurrency, $provider->getEnum());
-        $baseTo = $this->getRate($date, $baseCurrency, $providerBaseCurrency, $provider->getEnum());
+        // Промежуточные пары не кешируем — финальный кросс-рейт уже закешируется один раз в getRate().
+        $targetTo = $this->fetchDirectRate($provider, $date, $currency);
+        $baseTo = $this->fetchDirectRate($provider, $date, $baseCurrency);
 
         // Rate = Target / Base
         $rate = BcMath::div($targetTo->rate, $baseTo->rate, $this->currencyPrecision);
@@ -153,7 +153,7 @@ readonly class ProviderManager
         $targetPrev = $this->getPreviousValue($targetTo);
         $basePrev = $this->getPreviousValue($baseTo);
 
-        $diff = null;
+        $rateDiff = null;
         $dateDiff = null;
         if (null !== $targetPrev && null !== $basePrev) {
             $targetPrevNumeric = $this->requireNumericString($targetPrev, 'target previous rate');
@@ -161,7 +161,7 @@ readonly class ProviderManager
 
             if (0 !== BcMath::comp($basePrevNumeric, '0', $this->currencyPrecision)) {
                 $prevRate = BcMath::div($targetPrevNumeric, $basePrevNumeric, $this->currencyPrecision);
-                $diff = BcMath::sub($rate, $prevRate, $this->currencyPrecision);
+                $rateDiff = BcMath::sub($rate, $prevRate, $this->currencyPrecision);
                 // Use the dateDiff from the target rate as the reference date for the diff
                 $dateDiff = $targetTo->dateDiff;
             }
@@ -170,21 +170,21 @@ readonly class ProviderManager
         return new RateResponse(
             rate: $rate,
             date: $targetTo->date,
-            diff: $diff,
+            rateDiff: $rateDiff,
             dateDiff: $dateDiff,
         );
     }
 
     private function getPreviousValue(RateResponse $response): ?string
     {
-        if (null === $response->diff) {
+        if (null === $response->rateDiff) {
             return null;
         }
 
         $rate = $this->requireNumericString($response->rate, 'rate');
-        $diff = $this->requireNumericString($response->diff, 'diff');
+        $rateDiff = $this->requireNumericString($response->rateDiff, 'rateDiff');
 
-        return BcMath::sub($rate, $diff, $this->currencyPrecision);
+        return BcMath::sub($rate, $rateDiff, $this->currencyPrecision);
     }
 
     private function fetchDirectRate(ProviderRateInterface $provider, \DateTimeImmutable $date, string $currency, bool $invert = false): RateResponse
@@ -195,20 +195,20 @@ readonly class ProviderManager
             throw new RateNotFoundException($currency, $provider->getBaseCurrency());
         }
 
-        $diff = null;
+        $rateDiff = null;
         $dateDiff = null;
 
         if (isset($rates[1])) {
             $current = $this->requireNumericString($rates[0]->getRate($invert), 'current rate');
             $previous = $this->requireNumericString($rates[1]->getRate($invert), 'previous rate');
-            $diff = BcMath::sub($current, $previous, $this->currencyPrecision);
+            $rateDiff = BcMath::sub($current, $previous, $this->currencyPrecision);
             $dateDiff = $rates[1]->getDate()->format(Date::FORMAT);
         }
 
         return new RateResponse(
             rate: $rates[0]->getRate($invert),
             date: $rates[0]->getDate()->format(Date::FORMAT),
-            diff: $diff,
+            rateDiff: $rateDiff,
             dateDiff: $dateDiff,
         );
     }

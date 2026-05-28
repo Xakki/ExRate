@@ -31,11 +31,6 @@ final readonly class RcbProvider extends AbstractProviderRate
     ) {
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.rcb';
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::RCB;
@@ -75,8 +70,12 @@ final readonly class RcbProvider extends AbstractProviderRate
             if (isset($item['Date'])) {
                 try {
                     $responseDate = Date::createFromFormat('d.m.Y', $item['Date']);
-                } catch (\App\Exception\BadDateException) {
-                    // TODO: log notice
+                } catch (\App\Exception\BadDateException $e) {
+                    $this->logger->notice('Failed to parse date from provider response', [
+                        'provider' => $this->getEnum()->value,
+                        'raw' => $item['Date'],
+                        'error' => $e->getMessage(),
+                    ]);
                     // keep previous responseDate
                 }
             }

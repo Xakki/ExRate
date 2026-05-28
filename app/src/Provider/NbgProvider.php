@@ -31,11 +31,6 @@ final readonly class NbgProvider extends AbstractProviderRate
     ) {
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.nbg';
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::NBG;

@@ -34,11 +34,6 @@ final readonly class EcbProvider extends AbstractProviderRate
         return $this->periodDays;
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.ecb';
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::ECB;

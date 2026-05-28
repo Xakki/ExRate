@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Provider;
 
-use App\Contract\ProviderRateExtendInterface;
 use App\DTO\GetRatesResult;
 use App\DTO\RateExtendData;
 use App\Enum\ProviderEnum;
@@ -22,8 +21,15 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * List engines https://iss.moex.com/iss/engines.json
  * List markets https://iss.moex.com/iss/engines/stock/markets.json
  */
-final readonly class MoexProvider extends AbstractProviderRate implements ProviderRateExtendInterface
+final readonly class MoexProvider extends AbstractProviderRate
 {
+    public function getDataClass(): string
+    {
+        return RateExtendData::class;
+    }
+
+    // SECID -> [код для хранения, faceValue].
+    // XAU/XAG/XPT/XPD — ISO 4217 коды драгметаллов, торгующихся на MOEX наравне с фиатом.
     private const array SECID_MAP = [
         'CNYRUB_TOM' => [Currencies::CNY, 1],
         'KZTRUB_TOM' => [Currencies::KZT, 100],
@@ -66,12 +72,12 @@ final readonly class MoexProvider extends AbstractProviderRate implements Provid
         protected int $id,
         private string $url,
         private int $currencyPrecision,
+        private int $periodDays = 120,
+        private int $maxRangeDays = 366,
+        private int $delayBetweenPagesUs = 100000,
+        private int $delayBetweenSecidsUs = 200000,
+        private int $delayAfterRequestUs = 500000,
     ) {
-    }
-
-    public static function getServiceName(): string
-    {
-        return 'provider.moex';
     }
 
     public function getEnum(): ProviderEnum
@@ -106,8 +112,7 @@ final readonly class MoexProvider extends AbstractProviderRate implements Provid
 
     public function getPeriodDays(): int
     {
-        // MAx allow 366
-        return 120;
+        return $this->periodDays;
     }
 
     #[\Deprecated]
@@ -125,9 +130,8 @@ final readonly class MoexProvider extends AbstractProviderRate implements Provid
             throw new BadDateException('Start date must be before end date');
         }
 
-        // Limit range to 1 year to avoid huge requests
-        if (Date::getDayDiff($start, $end) > 366) {
-            throw new BadDateException('Date range too big. Max 365 days.');
+        if (Date::getDayDiff($start, $end) > $this->maxRangeDays) {
+            throw new BadDateException(sprintf('Date range too big. Max %d days.', $this->maxRangeDays));
         }
 
         $ratesByDate = [];
@@ -142,7 +146,7 @@ final readonly class MoexProvider extends AbstractProviderRate implements Provid
                         'start' => $startAt,
                     ],
                 ]);
-                usleep(500000);
+                usleep($this->delayAfterRequestUs);
 
                 if (!isset($data['history']) || empty($data['history']['data'])) {
                     break;
@@ -198,9 +202,9 @@ final readonly class MoexProvider extends AbstractProviderRate implements Provid
                 } else {
                     break;
                 }
-                usleep(100000); // 0.1s
+                usleep($this->delayBetweenPagesUs);
             }
-            usleep(200000); // 0.2s
+            usleep($this->delayBetweenSecidsUs);
         }
 
         $res = [];

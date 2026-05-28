@@ -38,11 +38,6 @@ final readonly class BankOfCanadaProvider extends AbstractProviderRate
         return $this->periodDays;
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.bank_of_canada';
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::BANK_OF_CANADA;

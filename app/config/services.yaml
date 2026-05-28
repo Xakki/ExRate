@@ -63,15 +63,20 @@ services:
 
     App\Cache\RateCache:
         arguments:
-            $cacheItemPool: '@first_cache'
+            $cacheItemPool: '@rate_cache'
 
     App\Cache\TimeseriesCache:
         arguments:
-            $cacheItemPool: '@third_cache'
+            $cacheItemPool: '@timeseries_cache'
 
     App\Cache\RateLimitCache:
         arguments:
-            $cacheItemPool: '@fourth_cache'
+            $redis: '@app.redis.rate_limit'
+
+    app.redis.rate_limit:
+        class: Redis
+        factory: ['Symfony\Component\Cache\Adapter\RedisAdapter', 'createConnection']
+        arguments: ['%env(REDIS_URL)%/4']
 
 
     # Providers

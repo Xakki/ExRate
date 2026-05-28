@@ -62,26 +62,38 @@ readonly class ProviderImporter
             try {
                 $days = $provider->getPeriodDays() ?: 60;
                 $startDate = $date->modify('-'.$days.' day');
-                $results = $provider->getRatesByRangeDate($startDate, $date);
-                if (count($results) > 0) {
-                    $this->checkCurrencyConsistency($provider, $results[0]);
-                    foreach ($results as $result) {
-                        $this->saveRates($result);
-                    }
+                try {
+                    $results = $provider->getRatesByRangeDate($startDate, $date);
+                } finally {
+                    // Считаем попытку даже при ошибке: внешний счётчик не должен зависнуть на 0,
+                    // иначе следующий цикл сразу повторит то же действие.
+                    $this->rateLimitCache->increment($providerEnum, $provider->getRequestLimitPeriod());
                 }
-                $this->rateLimitCache->increment($providerEnum, $provider->getRequestLimitPeriod());
+
+                if (0 === count($results)) {
+                    $this->logger->info('No data for range '.$startDate->format(Date::FORMAT).' - '.$date->format(Date::FORMAT), $context);
+
+                    return [FetchStatusEnum::EMPTY, $startDate];
+                }
+
+                $this->checkCurrencyConsistency($provider, $results[0]);
+                foreach ($results as $result) {
+                    $this->saveRates($result);
+                }
 
                 return [FetchStatusEnum::SUCCESS, $startDate];
             } catch (NotAvailableMethod) {
-                $ratesResult = $provider->getRatesByDate($date);
+                try {
+                    $ratesResult = $provider->getRatesByDate($date);
+                } finally {
+                    $this->rateLimitCache->increment($providerEnum, $provider->getRequestLimitPeriod());
+                }
             }
         } catch (LimitException $e) {
             $this->rateLimitCache->block($providerEnum, $e->secondsToReset);
 
             throw $e;
         }
-
-        $this->rateLimitCache->increment($providerEnum, $provider->getRequestLimitPeriod());
 
         if (!count($ratesResult->rates)) {
             $this->logger->info('No data for '.$date->format(Date::FORMAT), $context);

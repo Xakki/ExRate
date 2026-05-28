@@ -19,8 +19,8 @@ readonly class RateResponse implements \JsonSerializable
         public string $rate,
         #[OA\Property(description: 'Date of the exchange rate', example: '2026-02-10')]
         public string $date,
-        #[OA\Property(description: 'Difference with the previous trading day', example: '0.59620000')]
-        public ?string $diff,
+        #[OA\Property(property: 'rate_diff', description: 'Difference with the previous trading day', example: '0.59620000')]
+        public ?string $rateDiff,
         #[OA\Property(description: 'Date of the previous exchange rate used for diff', example: '2026-02-07')]
         public ?string $dateDiff = null,
     ) {
@@ -35,13 +35,13 @@ readonly class RateResponse implements \JsonSerializable
         return [
             'rate' => $this->rate,
             'date' => $this->date,
-            'diff' => $this->diff,
+            'rate_diff' => $this->rateDiff,
             'date_diff' => $this->dateDiff,
         ];
     }
 
     public function isFullData(): bool
     {
-        return !empty($this->diff) && !empty($this->dateDiff);
+        return !empty($this->rate) && !empty($this->rateDiff) && !empty($this->dateDiff);
     }
 }

@@ -37,11 +37,6 @@ final readonly class ApiLayerCurrencyDataProvider extends AbstractProviderRate
         }
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.api_layer_currency_data';
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::API_LAYER_CURRENCY_DATA;

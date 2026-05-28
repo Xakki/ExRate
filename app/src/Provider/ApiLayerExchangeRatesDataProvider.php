@@ -39,11 +39,6 @@ final readonly class ApiLayerExchangeRatesDataProvider extends AbstractProviderR
         }
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.api_layer_exchange_rates_data';
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::API_LAYER_EXCHANGE_RATES_DATA;

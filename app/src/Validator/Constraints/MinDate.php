@@ -7,7 +7,7 @@ namespace App\Validator\Constraints;
 use App\Enum\ProviderEnum;
 use Symfony\Component\Validator\Constraint;
 
-#[\Attribute(\Attribute::TARGET_PROPERTY | \Attribute::TARGET_METHOD | \Attribute::IS_REPEATABLE)]
+#[\Attribute(\Attribute::TARGET_PROPERTY | \Attribute::TARGET_METHOD)]
 class MinDate extends Constraint
 {
     public string $message = 'Date must be greater than or equal to {{ date }}.';

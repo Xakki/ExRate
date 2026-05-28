@@ -28,11 +28,6 @@ final readonly class NbrProvider extends AbstractProviderRate
     ) {
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.nbr';
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::NBR;
