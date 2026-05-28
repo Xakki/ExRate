@@ -9,8 +9,6 @@ use App\Enum\ProviderEnum;
 
 interface ProviderRateInterface
 {
-    public static function getServiceName(): string;
-
     public function getId(): int;
 
     public function getEnum(): ProviderEnum;
@@ -49,4 +47,9 @@ interface ProviderRateInterface
     public function getRequestDelay(): int;
 
     public function getPeriodDays(): int;
+
+    /**
+     * @return class-string<RateDataInterface>
+     */
+    public function getDataClass(): string;
 }

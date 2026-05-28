@@ -34,11 +34,6 @@ final readonly class FrankfurterProvider extends AbstractProviderRate
         return $this->periodDays;
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.frankfurter';
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::FRANKFURTER;

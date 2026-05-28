@@ -139,7 +139,7 @@ class ProviderManagerTest extends TestCase
         $result = $this->provider->getRate($dateNow, $currency, $baseCurrency, $providerEnum);
 
         $this->assertEquals('75.0', $result->rate);
-        $this->assertEquals('1', $result->diff);
+        $this->assertEquals('1', $result->rateDiff);
     }
 
     public function testGetRateDirectNotFound(): void

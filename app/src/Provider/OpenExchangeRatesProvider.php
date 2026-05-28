@@ -39,11 +39,6 @@ final readonly class OpenExchangeRatesProvider extends AbstractProviderRate
         }
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.open_exchange_rates';
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::OPEN_EXCHANGE_RATES;

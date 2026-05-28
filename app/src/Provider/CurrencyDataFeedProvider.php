@@ -34,11 +34,6 @@ final readonly class CurrencyDataFeedProvider extends AbstractProviderRate
         }
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.currency_data_feed';
-    }
-
     public function isActive(): bool
     {
         return !empty($this->apiKey);

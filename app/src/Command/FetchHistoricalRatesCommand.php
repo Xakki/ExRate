@@ -42,12 +42,10 @@ class FetchHistoricalRatesCommand extends Command
     {
         $providersEnum = [];
         $days = (int) $input->getOption('days');
-        $provider = $input->getOption('provider');
+        $providerName = $input->getOption('provider');
 
-        // $output->writeln("Dispatching jobs to fetch rates for the last $days days for ".($provider ?: 'All'));
-
-        if ($provider) {
-            $providersEnum[] = ProviderEnum::from($provider);
+        if ($providerName) {
+            $providersEnum[] = ProviderEnum::from($providerName);
         } else {
             $providersEnum = ProviderEnum::cases();
         }

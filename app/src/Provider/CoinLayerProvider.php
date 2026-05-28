@@ -35,11 +35,6 @@ final readonly class CoinLayerProvider extends AbstractProviderRate
         }
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.coin_layer';
-    }
-
     public function isActive(): bool
     {
         return !empty($this->apiKey);

@@ -6,7 +6,6 @@ namespace App\Entity;
 
 use App\Contract\RateEntityInterface;
 use App\Repository\RateRepository;
-use App\Util\BcMath;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -16,6 +15,8 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(name: 'date_idx', columns: ['date'])]
 class Rate implements RateEntityInterface
 {
+    use RateValueTrait;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -82,15 +83,6 @@ class Rate implements RateEntityInterface
         $this->baseCurrency = $baseCurrency;
 
         return $this;
-    }
-
-    public function getRate(bool $invert = false): string
-    {
-        if ($invert && $this->rate && is_numeric($this->rate)) {
-            return BcMath::div(1, $this->rate, 10);
-        }
-
-        return $this->rate;
     }
 
     public function setRate(string $rate): static

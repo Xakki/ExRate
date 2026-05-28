@@ -34,11 +34,6 @@ final readonly class XigniteProvider extends AbstractProviderRate
         }
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.xignite';
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::XIGNITE;

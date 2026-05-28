@@ -53,11 +53,6 @@ final readonly class BanxicoProvider extends AbstractProviderRate
         return $this->periodDays;
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.banxico';
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::BANXICO;

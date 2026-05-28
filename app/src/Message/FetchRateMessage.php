@@ -12,7 +12,7 @@ use Symfony\Component\Messenger\Stamp\DeduplicateStamp;
 use Symfony\Component\Messenger\Stamp\DelayStamp;
 use Symfony\Component\Messenger\Stamp\StampInterface;
 
-class FetchRateMessage
+readonly class FetchRateMessage
 {
     public function __construct(
         public \DateTimeImmutable $date,

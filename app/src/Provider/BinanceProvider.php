@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Provider;
 
-use App\Contract\ProviderRateExtendInterface;
 use App\DTO\GetRatesResult;
 use App\DTO\RateExtendData;
 use App\Enum\ProviderEnum;
@@ -18,7 +17,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 /**
  * @see https://binance-docs.github.io/apidocs/spot/en/
  */
-final readonly class BinanceProvider extends AbstractProviderRate implements ProviderRateExtendInterface
+final readonly class BinanceProvider extends AbstractProviderRate
 {
     public function __construct(
         protected HttpClientInterface $httpClient,
@@ -30,14 +29,14 @@ final readonly class BinanceProvider extends AbstractProviderRate implements Pro
     ) {
     }
 
+    public function getDataClass(): string
+    {
+        return RateExtendData::class;
+    }
+
     public function getPeriodDays(): int
     {
         return $this->periodDays;
-    }
-
-    public static function getServiceName(): string
-    {
-        return 'provider.binance';
     }
 
     public function getEnum(): ProviderEnum

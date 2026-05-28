@@ -34,11 +34,6 @@ final readonly class FastForexProvider extends AbstractProviderRate
         }
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.fast_forex';
-    }
-
     public function isActive(): bool
     {
         return !empty($this->apiKey);

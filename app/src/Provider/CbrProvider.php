@@ -33,11 +33,6 @@ final readonly class CbrProvider extends AbstractProviderRate
     ) {
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.cbr';
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::CBR;
@@ -83,8 +78,12 @@ final readonly class CbrProvider extends AbstractProviderRate
 
         try {
             $responseDate = Date::createFromFormat('d.m.Y', (string) $xml['Date']);
-        } catch (\App\Exception\BadDateException) {
-            // TODO: log notice
+        } catch (\App\Exception\BadDateException $e) {
+            $this->logger->notice('Failed to parse date from provider response', [
+                'provider' => $this->getEnum()->value,
+                'raw' => (string) $xml['Date'],
+                'error' => $e->getMessage(),
+            ]);
             $responseDate = $date;
         }
 

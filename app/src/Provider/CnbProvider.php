@@ -28,11 +28,6 @@ final readonly class CnbProvider extends AbstractProviderRate
     ) {
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.cnb';
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::CNB;
@@ -68,8 +63,12 @@ final readonly class CnbProvider extends AbstractProviderRate
         $dateParts = explode(' ', $firstLine);
         try {
             $responseDate = Date::createFromFormat('d.m.Y', $dateParts[0]);
-        } catch (\App\Exception\BadDateException) {
-            // TODO: log notice
+        } catch (\App\Exception\BadDateException $e) {
+            $this->logger->notice('Failed to parse date from provider response', [
+                'provider' => $this->getEnum()->value,
+                'raw' => $dateParts[0],
+                'error' => $e->getMessage(),
+            ]);
             $responseDate = $date;
         }
 

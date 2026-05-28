@@ -117,10 +117,11 @@ class WebTestCase extends \Symfony\Bundle\FrameworkBundle\Test\WebTestCase
 
     protected function getEntityManager(): EntityManager
     {
-        // @phpstan-ignore method.notFound
-        return self::$kernel->getContainer()
-            ->get('doctrine')
-            ->getManager();
+        $doctrine = self::$kernel->getContainer()->get('doctrine');
+        \assert($doctrine instanceof \Doctrine\Persistence\ManagerRegistry);
+
+        // @phpstan-ignore return.type
+        return $doctrine->getManager();
     }
 
     /**

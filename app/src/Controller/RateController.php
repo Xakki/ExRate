@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\Exception\DisabledProviderException;
 use App\Exception\RateNotFoundException;
+use App\Message\FetchRateMessage;
 use App\Request\RateRequest;
 use App\Request\TimeseriesRequest;
 use App\Response\RateResponse;
@@ -20,13 +21,16 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapQueryString;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\Routing\Attribute\Route;
 
 class RateController extends AbstractController
 {
-    public function __construct(private readonly ProviderManager $providerManager)
-    {
+    public function __construct(
+        private readonly ProviderManager $providerManager,
+        private readonly MessageBusInterface $bus,
+    ) {
     }
 
     #[Route('/', name: 'landing_page', methods: ['GET'])]
@@ -49,7 +53,7 @@ class RateController extends AbstractController
             properties: [
                 new OA\Property(property: 'rate', type: 'string', example: ''),
                 new OA\Property(property: 'date', type: 'string', example: ''),
-                new OA\Property(property: 'diff', type: 'string', example: ''),
+                new OA\Property(property: 'rate_diff', type: 'string', example: ''),
                 new OA\Property(property: 'date_diff', type: 'string', example: ''),
                 new OA\Property(property: 'timestamp', type: 'string', example: '2026-02-14T12:00:00+00:00'),
             ]
@@ -94,6 +98,10 @@ class RateController extends AbstractController
 
             return $this->json($response, $status, $headers);
         } catch (RateNotFoundException) {
+            $date = $request->getDateImmutable();
+            $message = new FetchRateMessage($date, $request->provider);
+            $this->bus->dispatch($message, $message->getStamps());
+
             return $this->json(
                 new RateResponse('', '', null, null),
                 202,

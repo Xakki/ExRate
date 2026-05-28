@@ -37,11 +37,6 @@ final readonly class CurrencyLayerProvider extends AbstractProviderRate
         }
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.currency_layer';
-    }
-
     public function isActive(): bool
     {
         // Currently returns 429 Too Many Requests

@@ -35,11 +35,6 @@ final readonly class ExchangeRatesApiProvider extends AbstractProviderRate
         }
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.exchange_rates_api';
-    }
-
     public function isActive(): bool
     {
         return !empty($this->apiKey);

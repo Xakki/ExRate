@@ -44,7 +44,7 @@ class RateControllerTest extends WebTestCase
         $url = '/api/v1/rate?currency='.Currencies::USD.'&date=2026-02-10';
         $data = $this->jsonRequest($client, 'GET', $url, 202);
         $this->assertEquals('', $data['rate']);
-        $this->assertEquals('', $data['diff']);
+        $this->assertEquals('', $data['rate_diff']);
     }
 
     public function testGetRateFoundNoDiff(): void
@@ -55,7 +55,7 @@ class RateControllerTest extends WebTestCase
         $url = '/api/v1/rate?currency='.Currencies::USD.'&date=2026-01-10';
         $data = $this->jsonRequest($client, 'GET', $url, 202);
         $this->assertEquals('75.0', $data['rate']);
-        $this->assertEquals('', $data['diff']);
+        $this->assertNull($data['rate_diff']);
     }
 
     public function testGetRateFoundWithDiff(): void
@@ -68,7 +68,7 @@ class RateControllerTest extends WebTestCase
 
         $this->assertEquals('75.0', $data['rate']);
         $this->assertEquals('2026-01-12', $data['date']);
-        $this->assertEquals('-3', $data['diff']);
+        $this->assertEquals('-3', $data['rate_diff']);
         $this->assertEquals('2026-01-11', $data['date_diff']);
     }
 

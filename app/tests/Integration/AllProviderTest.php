@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
-use App\Contract\ProviderRateExtendInterface;
+use App\DTO\RateExtendData;
 use App\Entity\Rate;
 use App\Entity\RateExtend;
 use App\Enum\ProviderEnum;
@@ -109,7 +109,7 @@ class AllProviderTest extends WebTestCase
             $res = $this->jsonRequest($client, 'GET', $url, 202);
 
             $this->assertNotEmpty($res['rate']);
-            $this->assertEmpty($res['diff']);
+            $this->assertEmpty($res['rate_diff']);
 
             $this->fetchRateMessage(
                 $date->modify('-1 day'),
@@ -120,7 +120,7 @@ class AllProviderTest extends WebTestCase
             // Повторный запрос выдает уже все данные (тк в тестах очередь выполняется как Sync)
             $res = $this->jsonRequest($client, 'GET', $url);
             $this->assertNotEmpty($res['rate']);
-            $this->assertNotEmpty($res['diff']);
+            $this->assertNotEmpty($res['rate_diff']);
 
             // Simple work day
             $this->fetchRateMessage(
@@ -146,7 +146,7 @@ class AllProviderTest extends WebTestCase
                 ]);
             }
         } else {
-            $repo = $provider instanceof ProviderRateExtendInterface ? $this->repoExtend : $this->repo;
+            $repo = RateExtendData::class === $provider->getDataClass() ? $this->repoExtend : $this->repo;
             $rates = $repo->findRatesByPeriod($provider, $currency, $provider->getBaseCurrency(), $date->modify('-'.$provider->getPeriodDays().' day'), $date);
             $this->assertGreaterThan(35, count($rates), 'Provide::getRatesByRangeDate() get less rows than 35');
         }

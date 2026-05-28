@@ -62,11 +62,6 @@ final readonly class FredProvider extends AbstractProviderRate
         }
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.fred';
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::FRED;

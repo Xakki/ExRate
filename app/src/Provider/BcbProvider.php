@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Provider;
 
-use App\Contract\ProviderRateExtendInterface;
 use App\DTO\GetRatesResult;
 use App\DTO\RateExtendData;
 use App\Enum\ProviderEnum;
@@ -23,7 +22,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * Example  https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoMoedaPeriodo(moeda=@moeda,dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)?@moeda=%27EUR%27&@dataInicial=%2701-03-2026%27&@dataFinalCotacao=%2702-19-2026%27&$format=json
  * Example  https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/CotacaoDolarPeriodo(dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)?@dataInicial=%2701-03-2026%27&@dataFinalCotacao=%2702-19-2026%27&$format=json
  */
-final readonly class BcbProvider extends AbstractProviderRate implements ProviderRateExtendInterface
+final readonly class BcbProvider extends AbstractProviderRate
 {
     use UrlTemplateTrait;
 
@@ -37,9 +36,9 @@ final readonly class BcbProvider extends AbstractProviderRate implements Provide
     ) {
     }
 
-    public static function getServiceName(): string
+    public function getDataClass(): string
     {
-        return 'provider.bcb';
+        return RateExtendData::class;
     }
 
     public function getEnum(): ProviderEnum

@@ -6,7 +6,6 @@ namespace App\Entity;
 
 use App\Contract\RateEntityInterface;
 use App\Repository\RateExtendRepository;
-use App\Util\BcMath;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -15,6 +14,8 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\UniqueConstraint(name: 'unique_rates_extend_idx', columns: ['provider_id', 'base_currency', 'date', 'currency'])]
 class RateExtend implements RateEntityInterface
 {
+    use RateValueTrait;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -45,8 +46,8 @@ class RateExtend implements RateEntityInterface
         #[ORM\Column(type: Types::DECIMAL, precision: 20, scale: 8)]
         private string $rate, // Close
 
-        #[ORM\Column(type: Types::INTEGER, options: ['unsigned' => true, 'default' => 1])]
-        private int $providerId = 1,
+        #[ORM\Column(type: Types::INTEGER, options: ['unsigned' => true])]
+        private int $providerId,
     ) {
         $this->createdAt = new \DateTimeImmutable();
     }
@@ -126,15 +127,6 @@ class RateExtend implements RateEntityInterface
         $this->rateHigh = $rateHigh;
 
         return $this;
-    }
-
-    public function getRate(bool $invert = false): string
-    {
-        if ($invert && $this->rate && is_numeric($this->rate)) {
-            return BcMath::div(1, $this->rate, 10);
-        }
-
-        return $this->rate;
     }
 
     public function setRate(string $rate): static

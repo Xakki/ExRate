@@ -31,11 +31,6 @@ final readonly class NbuProvider extends AbstractProviderRate
     ) {
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.nbu';
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::NBU;
@@ -76,8 +71,12 @@ final readonly class NbuProvider extends AbstractProviderRate
             if (isset($item->exchangedate)) {
                 try {
                     $responseDate = Date::createFromFormat('d.m.Y', (string) $item->exchangedate);
-                } catch (\App\Exception\BadDateException) {
-                    // TODO: log notice
+                } catch (\App\Exception\BadDateException $e) {
+                    $this->logger->notice('Failed to parse date from provider response', [
+                        'provider' => $this->getEnum()->value,
+                        'raw' => (string) $item->exchangedate,
+                        'error' => $e->getMessage(),
+                    ]);
                     // keep previous responseDate
                 }
             }

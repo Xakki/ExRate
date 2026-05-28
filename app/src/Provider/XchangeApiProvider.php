@@ -37,11 +37,6 @@ final readonly class XchangeApiProvider extends AbstractProviderRate
         }
     }
 
-    public static function getServiceName(): string
-    {
-        return 'provider.xchange_api';
-    }
-
     public function getEnum(): ProviderEnum
     {
         return ProviderEnum::XCHANGE_API;
